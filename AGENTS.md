@@ -51,3 +51,4 @@ node tools/headless.mjs --seed 1 --night 1 --ticks 600 --out out.jsonl
 - Quên sinh đom đóm/Bóng Mực mặc định khi không có scenario → luôn chạy thử CLI với và không có scenario.
 - Test khẳng định "bằng đúng" trong khi bất biến là "lớn hơn hoặc bằng" → viết test theo đúng bất biến.
 - Cảnh quá tối và Bóng Mực tới quá sớm → chỉnh sáng/spawn sau khi xem ảnh chụp thật, đừng đoán.
+- Phím A/D bị ngược: contract cố định `+x → +X`, camera nhìn theo `+Z` nên screen-right là `-X`. Đảo dấu strafe ở `src/input.js`, **không** sửa công thức trong `src/sim/`.

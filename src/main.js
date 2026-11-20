@@ -2,6 +2,7 @@ import { createWorld, stepWorld, drainEvents } from './sim/world.js';
 import { createStage } from './render/scene.js';
 import { createHud } from './render/hud.js';
 import { createSfx } from './render/sfx.js';
+import { moveFromKeys } from './input.js';
 
 const stage = createStage(document.getElementById('app'));
 const hud = createHud();
@@ -73,7 +74,7 @@ function inputState() {
     (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) -
     (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
   return {
-    move: [strafe, forward],
+    move: moveFromKeys(forward, strafe),
     cam_yaw_deg: (yaw * 180) / Math.PI,
     jump: keys.has('Space'),
     interact: keys.has('KeyE'),
