@@ -1,5 +1,16 @@
 # Changelog
 
+## Phase 3 — Đèn cạn dầu (Test Contract v1.2)
+
+Thay đổi phá vỡ tương thích:
+
+- Thời lượng ba đêm đổi thành 240, 270 và 300 giây. Thắng ở bình minh cần còn Ngọn Lửa và giữ đủ 3/5, 4/6 hoặc 5/7 đèn. Lý do thắng `dawn_survived` thay cho `all_lit`.
+- Đèn sáng nhận châm dầu, tự hao, có thể tắt và thắp lại với 5 đom đóm. Dưới 30 dầu vùng an toàn mất hiệu lực và Bóng Mực có thể vào trạng thái `drain`. Sức chứa tăng theo số lần thắp thành công.
+- Điểm thay đổi theo lần thắp, dầu, số đom đóm nạp và trạng thái Bóng Mực khi trúng Tỏa Sáng. Thưởng thời gian bị bỏ. Kỷ lục cục bộ bắt đầu lại theo thang điểm mới.
+- Snapshot và scenario nhận thêm dữ liệu đèn, sức chứa và mục tiêu hút. Sự kiện `lantern_lit` thêm `relight`; bổ sung `refuel`, `lantern_out` và `fuel_drain`.
+
+Giao diện thêm thanh dầu, hình đèn tắt có giấy rách, cảnh báo dầu thấp và tùy chọn bảng màu dễ phân biệt lưu cục bộ.
+
 ## Phase 2 — Ba đêm (Test Contract v1.1)
 
 - Chuẩn hóa tuning và mở rộng bản đồ từ Đảo Bến sang Đảo Cau và Đảo Chuông.

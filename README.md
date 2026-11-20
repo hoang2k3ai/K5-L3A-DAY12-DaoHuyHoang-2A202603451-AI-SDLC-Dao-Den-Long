@@ -22,23 +22,26 @@ Mở http://localhost:5173. Dùng Node.js 22.12+ hoặc 20.19+.
 | Esc / P | Tạm dừng |
 | R / M | Chơi lại / tắt tiếng |
 
-Đêm 1–3 có lần lượt 5, 6 và 7 đèn, với thời lượng 300, 330 và 360 giây. Mây mang tối đa 10 đom đóm, mỗi đèn cần 10. Tỏa Sáng tốn 3 đom đóm. Bóng Mực làm mất Ngọn Lửa, còn Gió Lạc cướp đom đóm. Bùa Gió tăng tốc chạy và bỏ hồi chiêu Lướt trong 10 giây.
+Mây phải sống tới bình minh và giữ ít nhất **3/5, 4/6, 5/7 đèn sáng** trong ba đêm dài lần lượt 240, 270 và 300 giây. Mỗi đèn cần 10 đom đóm để thắp lần đầu và 5 để thắp lại. Đèn tự hao 1 dầu mỗi giây. Nhấn E gần đèn đang sáng để châm dầu, mỗi đom đóm bổ sung tối đa 10 dầu. Mỗi lần thắp tăng sức chứa thêm 2, từ 10 đến tối đa 20.
 
-Điểm mỗi đêm gồm 10 điểm mỗi đom đóm nạp, 100 điểm mỗi đèn thắp và 5 điểm mỗi Bóng Mực trúng Tỏa Sáng. Khi thắng, cộng thêm 2 điểm mỗi giây còn lại (làm tròn xuống) và 50 điểm mỗi Ngọn Lửa còn lại. Bình Minh hiển thị tổng điểm của ba đêm đã thắng.
+Dưới 30 dầu, đèn nhấp nháy, mất vùng an toàn và có thể bị Bóng Mực hút dầu. Tỏa Sáng tốn 3 đom đóm. Gió Lạc cướp đom đóm, còn Bùa Gió tăng tốc chạy và bỏ hồi chiêu Lướt trong 10 giây. Chế độ **Bảng màu dễ phân biệt** nằm trong Cài đặt.
+
+Mỗi đom đóm nạp được 5 điểm. Thắp lần đầu được 100, thắp lại được 40. Tỏa Sáng được 5 điểm mỗi Bóng Mực trúng đòn, hoặc 15 nếu con đó đang hút dầu. Khi thắng, mỗi đèn sáng được thêm 50 điểm cộng phần nguyên lượng dầu còn lại và mỗi Ngọn Lửa được thêm 50. Bình Minh hiển thị tổng điểm của ba đêm đã thắng.
 
 ## Headless và kiểm chứng
 
 ```bash
-node tools/headless.mjs --seed 7 --night 3 --ticks 21600 --out out.jsonl
+node tools/headless.mjs --seed 7 --night 3 --ticks 18000 --out out.jsonl
 npm test
 npm run verify
 npm run build
 ```
 
-CLI Test Contract v1.1 nhận đêm 1, 2 hoặc 3 và tùy chọn `--scenario`, `--inputs`, `--snapshot-every`. Snapshot tick 0 đứng trước mọi input. CLI dừng khi thắng/thua hoặc đạt số bước yêu cầu, ghi dòng `end` cuối và trả mã 0 (thành công), 1 (lỗi runtime) hoặc 2 (đối số/dữ liệu sai). Cùng seed, scenario và input cho kết quả giống hệt.
+CLI Test Contract v1.2 nhận đêm 1, 2 hoặc 3 và tùy chọn `--scenario`, `--inputs`, `--snapshot-every`. Snapshot tick 0 đứng trước mọi input. CLI dừng khi thắng/thua hoặc đạt số bước yêu cầu, ghi dòng `end` cuối và trả mã 0 (thành công), 1 (lỗi runtime) hoặc 2 (đối số/dữ liệu sai). Cùng seed, scenario và input cho kết quả giống hệt.
 
-- [Test Contract v1.1](game.contract.json)
-- [Tiêu chí nghiệm thu Phase 2](docs/notes/phase-2-spec.md)
+- [Test Contract v1.2](game.contract.json)
+- [Quyết định thiết kế và tiêu chí nghiệm thu Phase 3](docs/notes/phase-3-adr.md)
+- [Bằng chứng Phase 3](docs/proof/phase-3/README.md)
 - [Bằng chứng Phase 2](docs/proof/phase-2/README.md)
 - [Bằng chứng lưu trữ Phase 1](docs/proof/phase-1/README.md)
 

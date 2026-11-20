@@ -1,0 +1,43 @@
+{
+  "random_motes": true,
+  "random_shades": true,
+  "random_drifters": true,
+  "time_left_s": 120,
+  "motes": [
+    [
+      2,
+      0,
+      3
+    ]
+  ],
+  "shades": [
+    {
+      "pos": [
+        12,
+        0,
+        -4
+      ]
+    }
+  ],
+  "drifters": [
+    {
+      "id": "D1",
+      "pos": [
+        8,
+        0,
+        8
+      ],
+      "state": "idle"
+    }
+  ],
+  "charms": [
+    {
+      "id": "C1",
+      "pos": [
+        3,
+        0,
+        3
+      ]
+    }
+  ]
+}

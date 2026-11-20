@@ -38,3 +38,8 @@ Bài học: chạy thật (CLI + ảnh chụp) bắt lỗi nhanh hơn đọc l�
 - Đối chiếu phần triển khai đang có với ticket, ghi tiêu chí nghiệm thu và các bảng dữ liệu còn thiếu.
 - Hoàn thiện luồng chiến dịch, tổng điểm, HUD, cảnh báo gió và âm thanh. Cập nhật hướng dẫn tái tạo bằng chứng v1.1.
 - Kiểm tra hồi chiêu, thứ tự va chạm và lịch sinh bằng CLI. Kiểm tra tạm dừng, dữ liệu cài đặt, chuyển đêm và tổng điểm bằng Chrome, lưu ảnh và số đo FPS.
+
+## Phase 3
+
+- Viết ADR về đơn vị dầu, thứ tự cập nhật và luật bình minh. Đồng bộ contract với tuning và thêm test cho hút dầu, thắp lại, vùng an toàn và kết quả tick cuối.
+- Nối thanh dầu và dấu hiệu đèn tắt vào cảnh 3D. Thêm tùy chọn bảng màu dùng chung giữa HUD và cảnh, lưu cùng cấu hình hiện có.

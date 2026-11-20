@@ -1,9 +1,9 @@
 ﻿#!/usr/bin/env node
-// Phase 2 proof suite (Test Contract v1.1).
+// Phase 3 proof suite (Test Contract v1.2).
 //
 // Every case is executed through the real headless CLI, asserted here, and
-// stored under docs/proof/phase-2/ so the grader can reproduce it at the
-// phase-2 tag. Outputs are never edited by hand.
+// stored under docs/proof/phase-3/ so the grader can reproduce it at the
+// phase-3 tag. Outputs are never edited by hand.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -14,7 +14,7 @@ import { TUNING } from '../src/sim/config.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const cli = path.join(root, 'tools', 'headless.mjs');
-const proofDir = path.join(root, 'docs', 'proof', 'phase-2');
+const proofDir = path.join(root, 'docs', 'proof', 'phase-3');
 const casesDir = path.join(proofDir, 'cases');
 fs.mkdirSync(casesDir, { recursive: true });
 
@@ -109,7 +109,7 @@ const CASES = [
   },
   {
     name: '05-deposit-and-tiebreak',
-    about: 'Nạp 10 đom đóm, chọn đèn gần nhất chưa sáng, hoà thì id nhỏ hơn',
+    about: 'Nạp 10 đom đóm, chọn đèn hợp lệ gần nhất, bằng nhau thì chọn id nhỏ hơn',
     scenario: {
       ...quiet,
       player: { pos: [0, 0, 0], carried: 10 },
@@ -127,9 +127,9 @@ const CASES = [
       const lit = lines.find((l) => l.type === 'event' && l.name === 'lantern_lit');
       assert(deposit && deposit.data.lantern_id === 'L1', 'tie must resolve to L1');
       assert(deposit.data.amount === TUNING.lantern_cost, `amount ${deposit.data.amount}`);
-      assert(lit && lit.data.lantern_id === 'L1', 'L1 must light');
+      assert(lit && lit.data.lantern_id === 'L1' && lit.data.relight === false, 'L1 must light for the first time');
       const last = lines.filter((l) => l.type === 'snapshot').pop();
-      assert(last.player.carried === 0, 'carried must be empty');
+      assert(last.player.carried === 0 && last.player.capacity === 12, 'capacity must increase on light');
       assert(last.score === 10 * TUNING.score.per_mote + TUNING.score.per_lantern, `score ${last.score}`);
       return `deposit 10 into L1, lit, score=${last.score}`;
     },
@@ -445,7 +445,7 @@ const CASES = [
   },
   {
     name: '22-night-start-and-durations',
-    about: 'night_start ở tick 0; thời lượng 300/330/360 giây',
+    about: 'night_start ở tick 0, Đêm 1 kéo dài 240 giây',
     night: 1,
     scenario: { ...quiet },
     ticks: 0,
@@ -453,18 +453,19 @@ const CASES = [
       const start = lines.find((l) => l.type === 'event' && l.name === 'night_start');
       assert(start && start.tick === 0 && start.data.night === 1, 'night_start missing at tick 0');
       const first = lines.find((l) => l.type === 'snapshot');
-      assert(first.time_left_s === 300 && first.night === 1, 'night 1 duration');
-      return 'night_start tick=0, duration=300 s';
+      assert(first.time_left_s === 240 && first.night === 1, 'night 1 duration');
+      return 'night_start tick=0, duration=240 s';
     },
   },
   {
     name: '23-win-order',
-    about: 'Thứ tự chuẩn khi thắng: deposit → lantern_lit → game_over',
+    about: 'Thắp đủ sớm và giữ đèn sáng đến tick bình minh',
     scenario: {
       ...quiet,
       player: { pos: [0, 0, 24], carried: 1 },
+      time_left_s: 0.05,
       lanterns: [
-        { id: 'L1', lit: true },
+        { id: 'L1', lit: true, pos: [0, 0, 15] },
         { id: 'L2', lit: true },
         { id: 'L3', lit: true },
         { id: 'L4', lit: true },
@@ -479,26 +480,25 @@ const CASES = [
       const deposit = events.indexOf('deposit');
       const lit = events.indexOf('lantern_lit');
       const over = events.indexOf('game_over');
-      assert(deposit !== -1 && lit !== -1 && over !== -1, `events at tick 1: ${events.join(',')}`);
-      assert(deposit < lit && lit < over, `wrong order: ${events.join(',')}`);
+      assert(deposit >= 0 && lit > deposit && over === -1, `events at tick 1: ${events.join(',')}`);
+      const dawn = lines.find((l) => l.name === 'game_over');
+      assert(dawn?.tick === 3 && dawn.data.reason === 'dawn_survived', 'expected win at dawn');
       const end = lines[lines.length - 1];
       assert(end.state === 'won', `state ${end.state}`);
-      return `tick 1 order = ${events.join(' -> ')}, state=won`;
+      return `tick 1: ${events.join(' -> ')}; tick 3: dawn_survived`;
     },
   },
   {
     name: '24-score-standard',
-    about: 'Điểm chuẩn: 10/đom đã nạp, 100/đèn, 5/lần choáng, 2/giây còn lại, 50/lửa còn lại',
+    about: 'Đèn thắp trong tick bình minh được tính điểm và tính vào ngưỡng thắng',
     scenario: {
       ...quiet,
       player: { pos: [0, 0, 24], carried: 1 },
-      shades: [{ pos: [0.5, 0, 0] }],
+      time_left_s: 1 / 60,
       lanterns: [
-        { id: 'L1', lit: true },
+        { id: 'L1', deposited: 9 },
         { id: 'L2', lit: true },
         { id: 'L3', lit: true },
-        { id: 'L4', lit: true },
-        { id: 'L5', pos: [0, 0, 25], deposited: 9 },
       ],
     },
     inputs: { frames: [{ tick: 0, interact: true }] },
@@ -506,9 +506,10 @@ const CASES = [
     snapshotEvery: 1,
     check(lines) {
       const last = lines.filter((l) => l.type === 'snapshot').pop();
-      const expected = TUNING.score.per_mote + TUNING.score.per_lantern + 299 * TUNING.score.per_second_left + TUNING.flames * TUNING.score.per_flame_left;
+      const expected = 5 + 100 + 2 * (50 + 99) + 50 + 100 + 3 * 50;
       assert(last.score === expected, `score ${last.score}, expected ${expected}`);
-      return `score=${last.score} = 10 + 100 + 299*2 + 3*50`;
+      assert(last.state === 'won', 'expected exactly three lit lanterns at dawn');
+      return `score=${last.score} = 5 + 100 + 2×149 + 150 + 3×50`;
     },
   },
   {
@@ -516,14 +517,14 @@ const CASES = [
     about: 'Một đêm đầy đủ chạy headless dưới 30 giây',
     night: 3,
     scenario: { ...quiet, random_shades: false },
-    ticks: 21600,
+    ticks: 18000,
     snapshotEvery: 3600,
     check(lines, meta) {
       const end = lines[lines.length - 1];
       assert(end.type === 'end', 'missing end line');
-      assert(end.ticks === 21600 && end.state === 'lost', 'expected a full night ending at dawn');
+      assert(end.ticks === 18000 && end.state === 'lost', 'expected a full night ending at dawn');
       assert(meta.elapsedMs < 30000, `took ${meta.elapsedMs} ms`);
-      return `21600 ticks in ${meta.elapsedMs} ms, state=${end.state}`;
+      return `18000 ticks in ${meta.elapsedMs} ms, state=${end.state}`;
     },
   },
   {
@@ -540,6 +541,84 @@ const CASES = [
       assert(at(2400).drifters.map((d) => d.id).join() === 'D1,D2', 'expected D2 at tick 2400');
       assert(at(3600).drifters.length === 2, 'drifter cap exceeded');
       return 'D1 at 1200, D2 at 2400, still 2 at 3600';
+    },
+  },
+  {
+    name: '28-decay-and-relight',
+    about: 'Đèn hết dầu trước tương tác, thắp lại với 5 đom đóm, tăng sức chứa',
+    scenario: {
+      ...quiet,
+      player: { pos: [0, 0, 24], carried: 5 },
+      lanterns: [{ id: 'L1', lit: true, fuel: 1, deposited: 10 }],
+    },
+    inputs: { frames: [{ tick: 59, interact: true }] },
+    ticks: 60,
+    check(lines) {
+      const events = lines.filter((l) => l.type === 'event' && l.tick === 60);
+      assert(events.map((l) => l.name).join() === 'lantern_out,deposit,lantern_lit', 'wrong relight order');
+      const last = lines.find((l) => l.type === 'snapshot' && l.tick === 60);
+      const l = last.lanterns[0];
+      assert(l.fuel === 100 && l.ever_lit && l.relit_count === 1 && l.deposited === 5, 'wrong relight state');
+      assert(events[2].data.relight && last.player.capacity === 12 && last.score === 65, 'wrong relight rewards');
+      return 'tick 60: out → relight, fuel 100, capacity 12, score 65';
+    },
+  },
+  {
+    name: '29-stacked-drain',
+    about: 'Hai Bóng Mực cùng hút 10 dầu/giây, cộng 1 dầu/giây tự hao',
+    scenario: {
+      ...quiet,
+      lanterns: [{ id: 'L1', lit: true, fuel: 27 }],
+      shades: [0, 1].map((x) => ({ pos: [x, 0, 25], state: 'drain', target_lantern_id: 'L1' })),
+    },
+    ticks: 150,
+    check(lines) {
+      const reports = lines.filter((l) => l.name === 'fuel_drain');
+      assert(reports.length === 4 && reports.map((l) => l.tick).join() === '60,60,120,120', 'wrong drain cadence');
+      assert(reports[0].data.fuel === 16 && reports[2].data.fuel === 5, 'wrong stacked drain');
+      const last = lines.find((l) => l.type === 'snapshot' && l.tick === 150);
+      assert(!last.lanterns[0].lit && last.lanterns[0].fuel === 0, 'should extinguish');
+      return '27 → 16 → 5 → 0; two reports per 60 ticks';
+    },
+  },
+  {
+    name: '30-refuel-safe-zone',
+    about: 'Châm dầu vượt ngưỡng 30, đẩy Bóng Mực khỏi vùng 6 m',
+    scenario: {
+      ...quiet,
+      player: { pos: [0, 0, 24], carried: 1 },
+      lanterns: [{ id: 'L1', lit: true, fuel: 29 }],
+      shades: [{ pos: [0, 0, 25], state: 'drain', target_lantern_id: 'L1' }],
+    },
+    inputs: { frames: [{ tick: 0, interact: true }] },
+    ticks: 1,
+    snapshotEvery: 1,
+    check(lines) {
+      const event = lines.find((l) => l.name === 'refuel');
+      const last = lines.find((l) => l.type === 'snapshot' && l.tick === 1);
+      assert(event?.data.amount === 1 && event.data.fuel === 38.9, 'wrong refuel');
+      const shade = last.shades[0];
+      assert(shade.state === 'wander' && Math.hypot(shade.pos[0], shade.pos[2] - 25) >= 6, 'shade not expelled');
+      assert(last.score === 5 && last.player.flames === 3, 'wrong refuel result');
+      return 'fuel 38.9, shade expelled, +5 points';
+    },
+  },
+  {
+    name: '31-pulse-drain',
+    about: 'Tỏa Sáng ngắt hút và cộng 15 điểm',
+    scenario: {
+      ...quiet,
+      player: { pos: [0, 0, 21], carried: 3 },
+      lanterns: [{ id: 'L1', lit: true, fuel: 20 }],
+      shades: [{ pos: [0, 0, 25], state: 'drain', target_lantern_id: 'L1' }],
+    },
+    inputs: { frames: [{ tick: 0, pulse: true }] },
+    ticks: 1,
+    snapshotEvery: 1,
+    check(lines) {
+      const last = lines.find((l) => l.type === 'snapshot' && l.tick === 1);
+      assert(last.score === 15 && last.shades[0].state === 'stunned', 'wrong drain pulse result');
+      return 'drain → stunned, +15 points';
     },
   },
 ];
@@ -681,7 +760,7 @@ const rows = results
   .sort((a, b) => a.name.localeCompare(b.name))
   .map((r) => `| ${r.ok ? 'PASS' : 'FAIL'} | ${r.name} | ${r.about} | ${r.detail} |`)
   .join('\n');
-const summary = `# Bằng chứng Phase 2 — Test Contract v1.1
+const summary = `# Bằng chứng Phase 3 — Test Contract v1.2
 
 Sinh tự động bằng \`npm run verify\` (chạy \`tools/headless.mjs\` thật, không sửa tay output).
 Mỗi case có \`scenario.json\`, \`inputs.json\` (nếu cần) và \`output.jsonl\` trong \`cases/<tên>/\`.
@@ -704,5 +783,5 @@ Máy chạy: Windows 11, Node ${process.version}. Contract không phụ thuộc 
 `;
 fs.writeFileSync(path.join(proofDir, 'README.md'), summary);
 
-console.log(`\nProof written to docs/proof/phase-2/ (${results.filter((r) => r.ok).length}/${results.length} passed)`);
+console.log(`\nProof written to docs/proof/phase-3/ (${results.filter((r) => r.ok).length}/${results.length} passed)`);
 if (failed) process.exitCode = 1;

@@ -19,7 +19,7 @@ Dùng khi: sắp báo "đã xong", sắp commit/tag, hoặc sau khi sửa `src/s
    ```bash
    npm run verify
    ```
-   Bằng chứng v1.1 nằm ở `docs/proof/phase-2/cases/` và được sinh lại từ CLI thật. Mọi case phải PASS, gồm so sánh byte trên cả ba đêm và lượt 21.600 tick dưới 30 giây.
+   Bằng chứng v1.2 nằm ở `docs/proof/phase-3/cases/` và được sinh lại từ CLI thật. Mọi case phải PASS, gồm so sánh byte trên cả ba đêm và lượt 18.000 tick dưới 30 giây.
 
 3. Kiểm tra contract:
    - `game.contract.json` khớp `TUNING` (đã có test).
@@ -28,11 +28,11 @@ Dùng khi: sắp báo "đã xong", sắp commit/tag, hoặc sau khi sửa `src/s
      node tools/headless.mjs --seed 1 --night 1 --ticks 1200 --out tmp/night1.jsonl
      node tools/headless.mjs --seed 1 --night 2 --ticks 1200 --out tmp/night2.jsonl
      node tools/headless.mjs --seed 1 --night 3 --ticks 1200 --out tmp/night3.jsonl
-     node tools/headless.mjs --seed 1 --night 2 --ticks 12 --scenario docs/proof/phase-2/cases/21-pause/scenario.json --inputs docs/proof/phase-2/cases/21-pause/inputs.json --out tmp/pause.jsonl
+     node tools/headless.mjs --seed 1 --night 1 --ticks 60 --scenario docs/proof/phase-3/cases/28-decay-and-relight/scenario.json --inputs docs/proof/phase-3/cases/28-decay-and-relight/inputs.json --out tmp/relight.jsonl
      ```
    - Dòng đầu là snapshot tick 0, dòng cuối là `{"type":"end",...}`.
 
-4. Chạy `npm run build`. Kiểm tra luồng ba đêm, tạm dừng, cài đặt, HUD và âm thanh trong trình duyệt, đo FPS trung bình ở 1280×720.
+4. Chạy `npm run build`. Kiểm tra thanh dầu, trạng thái hình đèn, kết quả bình minh và tùy chọn bảng màu sau khi tải lại trình duyệt. Đo FPS trung bình ở 1280×720 khi đổi cảnh 3D.
 5. Nếu sửa hành vi: cập nhật `docs/notes/` và `CHANGELOG.md`.
 
 ## Không được làm
