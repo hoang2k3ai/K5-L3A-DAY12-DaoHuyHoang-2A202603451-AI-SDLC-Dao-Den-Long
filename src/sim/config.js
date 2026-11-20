@@ -1,6 +1,6 @@
 // Tunable numbers. These are the single source of truth and must match
 // game.contract.json (the grader generates test situations from them).
-// Values are the Phase 2 standardisation from TICKET-02, Contract v1.1.
+// Standard tuning for Test Contract v1.2.
 export const TUNING = Object.freeze({
   player_speed: 6.0, // m/s
   carry_capacity: 10, // motes
@@ -10,9 +10,9 @@ export const TUNING = Object.freeze({
   interact_radius: 2.0, // m, horizontal
   pulse_cost: 3, // motes spent per pulse
   pulse_radius: 5.0, // m, 3D distance to the shade centre
-  night1_duration_s: 300,
-  night2_duration_s: 330,
-  night3_duration_s: 360,
+  night1_duration_s: 240,
+  night2_duration_s: 270,
+  night3_duration_s: 300,
   flames: 3, // player light / health pool, refilled every night
   invuln_s: 1.5, // 90 ticks
   hit_drop_ratio: 0.5, // floor(carried * ratio) motes dropped on a hit
@@ -26,11 +26,21 @@ export const TUNING = Object.freeze({
   dash_speed: 14.0, // m/s
   dash_duration_s: 0.2, // 12 ticks
   dash_cooldown_s: 1.5, // 90 ticks, measured from dash start
+  fuel_max: 100,
+  fuel_decay_per_s: 1,
+  fuel_per_mote: 10,
+  relight_cost: 5,
+  win_ratio: 0.6,
+  drain_per_s: 5,
+  low_fuel_threshold: 30,
+  capacity_max: 20,
   score: Object.freeze({
-    per_mote: 10, // per mote DEPOSITED into a lantern
-    per_lantern: 100,
+    per_mote: 5,
+    per_lantern: 100, // first light
+    per_relight: 40,
     per_stun: 5, // per shade hit by one pulse
-    per_second_left: 2, // win bonus
+    per_drain_stun: 15,
+    per_dawn_lantern: 50,
     per_flame_left: 50, // win bonus
   }),
 });
@@ -53,6 +63,8 @@ export const WORLD = Object.freeze({
   shade_recoil_m: 2,
   shade_detect_m: 12,
   shade_give_up_m: 18,
+  shade_drain_radius: 2,
+  shade_drain_interrupt_radius: 6,
   shade_height_tolerance: 1.5,
   drifter_speed: 7,
   drifter_idle_speed: 2,

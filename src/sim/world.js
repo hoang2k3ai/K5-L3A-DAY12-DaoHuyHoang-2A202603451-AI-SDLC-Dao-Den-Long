@@ -1,4 +1,4 @@
-// Deterministic 60 Hz game simulation (Contract v1.1).
+// Deterministic 60 Hz game simulation (Contract v1.2).
 //
 // This module has no rendering, no DOM and no GPU dependency: the browser and
 // the headless CLI run exactly the same code, which is what makes the
@@ -19,6 +19,27 @@ export const TICK_RATE = 60;
 export const SECONDS_PER_TICK = 1 / 60;
 
 const DT = SECONDS_PER_TICK;
+const fuelUnits = (fuel) => Math.round(fuel * TICK_RATE);
+export const lanternFuel = (lantern) => lantern.fuel_units / TICK_RATE;
+const roundedFuel = (lantern) => Math.round(lanternFuel(lantern) * 10) / 10;
+
+export function carryCapacity(world) {
+  return Math.min(world.tuning.capacity_max, world.tuning.carry_capacity + 2 * world.player.successful_lights);
+}
+
+export function lanternGoal(world) {
+  return Math.ceil(world.tuning.win_ratio * world.lanterns.length);
+}
+
+export function lightingCost(world, lantern) {
+  return lantern.ever_lit ? world.tuning.relight_cost : world.tuning.lantern_cost;
+}
+
+export function lanternHasSafeZone(world, lantern) {
+  return lantern.lit && lantern.fuel_units >= fuelUnits(world.tuning.low_fuel_threshold);
+}
+
+const isWeak = (world, lantern) => lantern.lit && !lanternHasSafeZone(world, lantern);
 
 const round3 = (v) => {
   const x = Math.round((v + Number.EPSILON) * 1000) / 1000;
@@ -62,6 +83,7 @@ export function createWorld({ seed = 0, night = 1, scenario = null, tuning = TUN
       facing: map.spawn_facing,
       grounded: true,
       carried: 0,
+      successful_lights: 0,
       flames: tuning.flames,
       invuln_until: 0,
       dash_until: 0,
@@ -81,6 +103,9 @@ export function createWorld({ seed = 0, night = 1, scenario = null, tuning = TUN
       z: l.z,
       lit: false,
       deposited: 0,
+      fuel_units: 0,
+      ever_lit: false,
+      relit_count: 0,
     })),
     motes: [],
     shades: [],
@@ -160,6 +185,7 @@ function applyScenario(world, rawScenario) {
       p.grounded = support !== null && Math.abs(p.y - support) < 1e-6;
     }
     if (sc.player.carried !== undefined) p.carried = sc.player.carried;
+    if (sc.player.successful_lights !== undefined) p.successful_lights = sc.player.successful_lights;
     if (sc.player.flames !== undefined) p.flames = sc.player.flames;
     if (sc.player.invuln_ticks !== undefined) p.invuln_until = sc.player.invuln_ticks;
     if (sc.player.dash_cd_ticks !== undefined) p.dash_ready_at = sc.player.dash_cd_ticks;
@@ -181,8 +207,12 @@ function applyScenario(world, rawScenario) {
       lantern.z = patch.pos[2];
     }
     if (patch.deposited !== undefined) lantern.deposited = patch.deposited;
-    if (patch.lit !== undefined) lantern.lit = patch.lit;
-    if (lantern.deposited >= world.tuning.lantern_cost) lantern.lit = true;
+    if (patch.ever_lit !== undefined) lantern.ever_lit = patch.ever_lit;
+    lantern.lit = patch.lit ?? (lantern.lit || lantern.deposited >= lightingCost(world, lantern));
+    if (lantern.lit) {
+      lantern.ever_lit = true;
+      lantern.fuel_units = fuelUnits(patch.fuel ?? world.tuning.fuel_max);
+    }
   }
 
   if (sc.motes) {
@@ -214,6 +244,8 @@ function applyScenario(world, rawScenario) {
         recoil_dx: 1,
         recoil_dz: 0,
         safe_push_until: 0,
+        target_lantern_id: s.target_lantern_id ?? null,
+        drain_ticks: 0,
       };
       if (s.state_ticks_left !== undefined) {
         shade.state_until = s.state_ticks_left;
@@ -511,10 +543,6 @@ function triggerFall(world, now) {
   const lost = p.carried;
   p.carried = 0;
   emit(world, 'player_hit', { by: 'fall', flames: p.flames, dropped: 0, lost });
-  if (p.flames <= 0) {
-    lose(world, 'no_flames');
-    return;
-  }
   p.falling = true;
   p.falling_until = now + WORLD.fall_wait_ticks;
   p.vx = 0;
@@ -549,7 +577,8 @@ function pickUp(world, now) {
   const p = world.player;
   if (p.falling) return;
 
-  for (let i = 0; i < world.motes.length && p.carried < world.tuning.carry_capacity; ) {
+  const capacity = carryCapacity(world);
+  for (let i = 0; i < world.motes.length && p.carried < capacity; ) {
     const m = world.motes[i];
     if (!canPick(world, m.x, m.y, m.z)) {
       i++;
@@ -573,48 +602,107 @@ function pickUp(world, now) {
   }
 }
 
-function interact(world, now, edges) {
+function nearestLantern(world, x, z, accepts, maxDistance = Infinity) {
+  let target = null;
+  let best = Infinity;
+  // Map lanterns are stored in id order, preserving the smaller id on ties.
+  for (const lantern of world.lanterns) {
+    if (!accepts(lantern)) continue;
+    const distance = Math.hypot(x - lantern.x, z - lantern.z);
+    if (distance <= maxDistance && distance < best) {
+      best = distance;
+      target = lantern;
+    }
+  }
+  return target;
+}
+
+export function interactionLantern(world) {
+  const { x, z } = world.player;
+  return nearestLantern(world, x, z, (l) => l.lit
+    ? l.fuel_units < fuelUnits(world.tuning.fuel_max)
+    : l.deposited < lightingCost(world, l), world.tuning.interact_radius);
+}
+
+function interact(world, edges) {
   if (!edges.interact) return;
   const p = world.player;
   if (p.falling || p.carried <= 0) return;
 
-  let target = null;
-  let best = Number.POSITIVE_INFINITY;
-  for (const lantern of world.lanterns) {
-    if (lantern.lit) continue;
-    const d = Math.hypot(p.x - lantern.x, p.z - lantern.z);
-    if (d > world.tuning.interact_radius) continue;
-    // Lanterns are stored in id order, so `<` keeps the smaller id on ties.
-    if (d < best) {
-      best = d;
-      target = lantern;
-    }
-  }
+  const target = interactionLantern(world);
   if (!target) return;
 
-  const amount = Math.min(p.carried, world.tuning.lantern_cost - target.deposited);
-  if (amount <= 0) return;
+  const tuning = world.tuning;
+  const max = fuelUnits(tuning.fuel_max);
+  const perMote = fuelUnits(tuning.fuel_per_mote);
+  const cost = lightingCost(world, target);
+  const needed = target.lit ? Math.ceil((max - target.fuel_units) / perMote) : cost - target.deposited;
+  const amount = Math.min(p.carried, needed);
 
   p.carried -= amount;
+  world.score += amount * tuning.score.per_mote;
+  if (target.lit) {
+    target.fuel_units = Math.min(max, target.fuel_units + perMote * amount);
+    emit(world, 'refuel', { lantern_id: target.id, amount, fuel: roundedFuel(target) });
+    return;
+  }
+
   target.deposited += amount;
-  world.score += amount * world.tuning.score.per_mote;
   emit(world, 'deposit', {
     lantern_id: target.id,
     amount,
     deposited: target.deposited,
   });
 
-  if (!target.lit && target.deposited >= world.tuning.lantern_cost) {
+  if (target.deposited >= cost) {
+    const relight = target.ever_lit;
     target.lit = true;
-    world.score += world.tuning.score.per_lantern;
-    emit(world, 'lantern_lit', { lantern_id: target.id });
+    target.ever_lit = true;
+    target.fuel_units = max;
+    target.relit_count += Number(relight);
+    p.successful_lights += 1;
+    world.score += relight ? tuning.score.per_relight : tuning.score.per_lantern;
+    emit(world, 'lantern_lit', { lantern_id: target.id, relight });
+  }
+}
+
+function drainTarget(world, shade) {
+  const target = world.lanterns.find((l) => l.id === shade.target_lantern_id);
+  if (target && isWeak(world, target) &&
+      Math.hypot(target.x - shade.x, target.z - shade.z) <= WORLD.shade_drain_radius) return target;
+  return null;
+}
+
+function spendFuel(world) {
+  const reports = [];
+  for (const shade of world.shades) {
+    if (shade.state !== 'drain') continue;
+    const target = drainTarget(world, shade);
+    if (!target) continue;
+    // Accumulate all drains before changing any lantern's lit state.
+    target.fuel_units -= world.tuning.drain_per_s;
+    shade.drain_ticks += 1;
+    if (shade.drain_ticks % TICK_RATE === 0) reports.push({ shade, target });
+  }
+
+  for (const lantern of world.lanterns) {
+    if (lantern.lit) lantern.fuel_units = Math.max(0, lantern.fuel_units - world.tuning.fuel_decay_per_s);
+  }
+  for (const { shade, target } of reports) {
+    emit(world, 'fuel_drain', { lantern_id: target.id, shade_id: shade.id, fuel: roundedFuel(target) });
+  }
+  for (const lantern of world.lanterns) {
+    if (!lantern.lit || lantern.fuel_units > 0) continue;
+    lantern.lit = false;
+    lantern.deposited = 0;
+    emit(world, 'lantern_out', { lantern_id: lantern.id });
   }
 }
 
 function updateSafeZones(world, now) {
   for (const s of world.shades) {
     for (const l of world.lanterns) {
-      if (!l.lit) continue;
+      if (!lanternHasSafeZone(world, l)) continue;
       const dx = s.x - l.x;
       const dz = s.z - l.z;
       const d = Math.hypot(dx, dz);
@@ -648,7 +736,9 @@ function doPulse(world, now, edges) {
     const sy = s.baseY + 1;
     const d = Math.hypot(s.x - cx, sy - cy, s.z - cz);
     if (d > world.tuning.pulse_radius) continue;
+    const wasDraining = s.state === 'drain';
     s.state = 'stunned';
+    s.target_lantern_id = null;
     s.state_until = now + WORLD.pulse_stun_ticks;
     s.stun_push_left = WORLD.pulse_push_ticks;
     let dx = s.x - cx;
@@ -663,7 +753,7 @@ function doPulse(world, now, edges) {
     }
     s.push_dx = dx;
     s.push_dz = dz;
-    world.score += world.tuning.score.per_stun;
+    world.score += wasDraining ? world.tuning.score.per_drain_stun : world.tuning.score.per_stun;
     stunned.push(s.id);
   }
 
@@ -727,6 +817,12 @@ function updateShades(world, now) {
     }
 
     const d = Math.hypot(world.player.x - s.x, world.player.z - s.z);
+    if (s.state === 'drain') {
+      if (!drainTarget(world, s)) s.state = 'wander';
+      else if (d <= WORLD.shade_drain_interrupt_radius) s.state = 'chase';
+      if (s.state !== 'drain') s.target_lantern_id = null;
+      continue;
+    }
     if (s.state === 'wander' && d <= WORLD.shade_detect_m) s.state = 'chase';
     else if (s.state === 'chase' && d > WORLD.shade_give_up_m) s.state = 'wander';
 
@@ -736,6 +832,23 @@ function updateShades(world, now) {
         moveShadeEntity(world, s, ((world.player.x - s.x) / d) * speed * DT, ((world.player.z - s.z) / d) * speed * DT);
       }
     } else {
+      const weak = nearestLantern(world, s.x, s.z, (l) => isWeak(world, l));
+      const target = weak ?? nearestLantern(world, s.x, s.z, (l) => !l.lit);
+      if (target) {
+        const dx = target.x - s.x;
+        const dz = target.z - s.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance > 0 && (!weak || distance > WORLD.shade_drain_radius)) {
+          const travel = Math.min(distance, WORLD.shade_wander_speed * DT);
+          moveShadeEntity(world, s, dx / distance * travel, dz / distance * travel);
+        }
+        if (weak && Math.hypot(target.x - s.x, target.z - s.z) <= WORLD.shade_drain_radius) {
+          s.state = 'drain';
+          s.target_lantern_id = target.id;
+          s.drain_ticks = 0;
+        }
+        continue;
+      }
       if (now >= s.wander_until) {
         const a = world.rng() * Math.PI * 2;
         s.wander_dx = Math.cos(a);
@@ -797,7 +910,7 @@ function updateDrifters(world, now) {
 
 function insideAnySafe(world, x, z) {
   for (const l of world.lanterns) {
-    if (!l.lit) continue;
+    if (!lanternHasSafeZone(world, l)) continue;
     if (Math.hypot(x - l.x, z - l.z) < world.tuning.safe_radius) return true;
   }
   return false;
@@ -848,6 +961,7 @@ function resolveContacts(world, now) {
 
   const sorted = [...world.shades].sort((a, b) => shadeNum(a.id) - shadeNum(b.id));
   for (const s of sorted) {
+    if (s.state === 'drain' || now < s.safe_push_until) continue;
     if (s.state === 'spawning' || s.state === 'stunned' || s.state === 'recoil') continue;
     if (insideAnySafe(world, s.x, s.z)) continue;
     if (Math.hypot(p.x - s.x, p.z - s.z) > world.tuning.shade_hit_radius) continue;
@@ -906,6 +1020,8 @@ function spawnShade(world, now) {
     recoil_dx: 1,
     recoil_dz: 0,
     safe_push_until: 0,
+    target_lantern_id: null,
+    drain_ticks: 0,
   };
   world.shades.push(shade);
   emit(world, 'shade_spawned', { id: shade.id });
@@ -971,15 +1087,13 @@ function spawnScheduled(world, now) {
   }
 }
 
-function win(world) {
-  if (world.state !== 'playing') return;
-  const remaining = Math.max(0, timeLeft(world));
-  world.score +=
-    Math.floor(remaining) * world.tuning.score.per_second_left +
-    Math.max(0, world.player.flames) * world.tuning.score.per_flame_left;
+function win(world, lit) {
+  const score = world.tuning.score;
+  for (const lantern of lit) world.score += score.per_dawn_lantern + Math.floor(lanternFuel(lantern));
+  world.score += world.player.flames * score.per_flame_left;
   world.state = 'won';
-  world.end_reason = 'all_lit';
-  emit(world, 'game_over', { result: 'won', reason: 'all_lit' });
+  world.end_reason = 'dawn_survived';
+  emit(world, 'game_over', { result: 'won', reason: world.end_reason });
 }
 
 function lose(world, reason) {
@@ -995,11 +1109,10 @@ function checkEnd(world) {
     lose(world, 'no_flames');
     return;
   }
-  if (world.lanterns.every((l) => l.lit)) {
-    win(world);
-    return;
-  }
-  if (timeLeft(world) <= 0) lose(world, 'dawn');
+  if (timeLeft(world) > 0) return;
+  const lit = world.lanterns.filter((l) => l.lit);
+  if (lit.length >= lanternGoal(world)) win(world, lit);
+  else lose(world, 'dawn');
 }
 
 /* ------------------------------------------------------------------ */
@@ -1034,19 +1147,19 @@ export function stepWorld(world, liveInput = null) {
 
   updateWind(world, now);
   expireTimers(world, now);
+  spendFuel(world);
 
   movePlayer(world, now, edges);
-  if (world.state !== 'playing') return;
-
-  pickUp(world, now);
-  interact(world, now, edges);
+  if (world.player.flames > 0) {
+    pickUp(world, now);
+    interact(world, edges);
+  }
   updateSafeZones(world, now);
-  doPulse(world, now, edges);
+  if (world.player.flames > 0) doPulse(world, now, edges);
   updateShades(world, now);
   updateSafeZones(world, now); // enforce the boundary after every shade move
   updateDrifters(world, now);
-  resolveContacts(world, now);
-  if (world.state !== 'playing') return;
+  if (world.player.flames > 0) resolveContacts(world, now);
 
   spawnScheduled(world, now);
   checkEnd(world);
@@ -1086,6 +1199,7 @@ export function snapshot(world) {
       vel: [round3(p.vx), round3(p.vy), round3(p.vz)],
       flames: p.flames,
       carried: p.carried,
+      capacity: carryCapacity(world),
       grounded: p.grounded,
       invuln: round3(Math.max(0, (p.invuln_until - now) / TICK_RATE)),
       dash_cd_s: round3(charmActive ? 0 : Math.max(0, (p.dash_ready_at - now) / TICK_RATE)),
@@ -1097,6 +1211,9 @@ export function snapshot(world) {
       pos: [round3(l.x), round3(l.y), round3(l.z)],
       lit: l.lit,
       deposited: l.deposited,
+      fuel: roundedFuel(l),
+      ever_lit: l.ever_lit,
+      relit_count: l.relit_count,
     })),
     shades: world.shades.map((s) => ({
       id: s.id,

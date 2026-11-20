@@ -1,5 +1,6 @@
-// Validation for the two JSON inputs of Test Contract v1.1.
+// Validation for the two JSON inputs of Test Contract v1.2.
 // Any malformed file must make the headless run exit with code 2.
+import { TUNING } from './config.js';
 
 export class ContractError extends Error {
   constructor(message) {
@@ -12,7 +13,7 @@ const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v)
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const isInt = (v) => Number.isInteger(v);
 
-const SHADE_STATES = ['spawning', 'wander', 'chase', 'recoil', 'stunned'];
+const SHADE_STATES = ['spawning', 'wander', 'chase', 'recoil', 'stunned', 'drain'];
 const DRIFTER_STATES = ['idle', 'chase', 'flee', 'removed'];
 
 function fail(where, msg) {
@@ -58,6 +59,12 @@ export function parseScenario(raw) {
         player[key] = p[key];
       }
     }
+    if (p.successful_lights !== undefined) {
+      if (!isInt(p.successful_lights) || p.successful_lights < 0) {
+        fail('scenario.player.successful_lights', 'phải là số nguyên >= 0');
+      }
+      player.successful_lights = p.successful_lights;
+    }
     out.player = player;
   }
 
@@ -98,6 +105,12 @@ export function parseScenario(raw) {
       if (s.state_ticks_left !== undefined) {
         checkTicks(`scenario.shades[${i}].state_ticks_left`, s.state_ticks_left);
         item.state_ticks_left = s.state_ticks_left;
+      }
+      if (s.target_lantern_id !== undefined) {
+        if (typeof s.target_lantern_id !== 'string' || !s.target_lantern_id) {
+          fail(`scenario.shades[${i}].target_lantern_id`, 'phải là chuỗi khác rỗng');
+        }
+        item.target_lantern_id = s.target_lantern_id;
       }
       return item;
     });
@@ -177,6 +190,16 @@ export function parseScenario(raw) {
       if (l.lit !== undefined) {
         if (typeof l.lit !== 'boolean') fail(`scenario.lanterns[${i}].lit`, 'phải là boolean');
         item.lit = l.lit;
+      }
+      if (l.fuel !== undefined) {
+        if (!isNum(l.fuel) || l.fuel < 0 || l.fuel > TUNING.fuel_max) {
+          fail(`scenario.lanterns[${i}].fuel`, `phải là số từ 0 đến ${TUNING.fuel_max}`);
+        }
+        item.fuel = l.fuel;
+      }
+      if (l.ever_lit !== undefined) {
+        if (typeof l.ever_lit !== 'boolean') fail(`scenario.lanterns[${i}].ever_lit`, 'phải là boolean');
+        item.ever_lit = l.ever_lit;
       }
       return item;
     });

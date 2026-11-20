@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Headless runner for Test Contract v1.1 (Phase 2).
+// Headless runner for Test Contract v1.2 (Phase 3).
 //
 //   node tools/headless.mjs --seed 7 --night 1 --ticks 600 \
 //     --out out.jsonl [--scenario s.json] [--inputs i.json] [--snapshot-every 10]

@@ -81,7 +81,7 @@ test('night_start is the first event and reports the chosen night', () => {
 
 test('each night uses its own standard duration', () => {
   const dir = tmpdir();
-  const expected = { 1: 300, 2: 330, 3: 360 };
+  const expected = { 1: 240, 2: 270, 3: 300 };
   for (const night of [1, 2, 3]) {
     const out = path.join(dir, `d${night}.jsonl`);
     assert.equal(runCli(['--night', String(night), '--ticks', '0', '--out', out]).status, 0);
@@ -148,7 +148,7 @@ test('unknown extra flags are ignored instead of crashing', () => {
   assert.ok(fs.existsSync(out));
 });
 
-test('an early win stops the run and reports the winning state', () => {
+test('lighting every lantern waits until dawn before the CLI reports a win', () => {
   const dir = tmpdir();
   const scenario = path.join(dir, 'win.json');
   const out = path.join(dir, 'win.jsonl');
@@ -156,11 +156,12 @@ test('an early win stops the run and reports the winning state', () => {
     scenario,
     JSON.stringify({
       player: { pos: [0, 0, 24], carried: 1 },
+      time_left_s: 0.05,
       random_motes: false,
       random_shades: false,
       motes: [],
       lanterns: [
-        { id: 'L1', lit: true },
+        { id: 'L1', lit: true, pos: [0, 0, 15] },
         { id: 'L2', lit: true },
         { id: 'L3', lit: true },
         { id: 'L4', lit: true },
@@ -175,8 +176,9 @@ test('an early win stops the run and reports the winning state', () => {
   const lines = readJsonl(out);
   const end = lines[lines.length - 1];
   assert.equal(end.state, 'won');
-  assert.equal(end.ticks, 1);
-  assert.ok(lines.some((l) => l.type === 'event' && l.name === 'game_over' && l.data.reason === 'all_lit'));
+  assert.equal(end.ticks, 3);
+  assert.ok(lines.some((l) => l.type === 'event' && l.name === 'lantern_lit' && l.tick === 1));
+  assert.ok(lines.some((l) => l.type === 'event' && l.name === 'game_over' && l.data.reason === 'dawn_survived'));
 });
 
 test('a pause frame keeps the run alive but freezes the clock', () => {
@@ -214,7 +216,7 @@ test('a full night runs headless in well under 30 seconds', () => {
   const dir = tmpdir();
   const out = path.join(dir, 'full.jsonl');
   const started = Date.now();
-  const result = runCli(['--seed', '9', '--night', '3', '--ticks', '21600', '--snapshot-every', '600', '--out', out]);
+  const result = runCli(['--seed', '9', '--night', '3', '--ticks', '18000', '--snapshot-every', '600', '--out', out]);
   const elapsed = Date.now() - started;
   assert.equal(result.status, 0, result.stderr);
   const lines = readJsonl(out);

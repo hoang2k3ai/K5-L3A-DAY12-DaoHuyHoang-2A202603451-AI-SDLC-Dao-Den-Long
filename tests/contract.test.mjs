@@ -163,13 +163,14 @@ test('interact outside interact_radius does nothing', () => {
   assert.equal(world.player.carried, 10);
 });
 
-test('nearest unlit lantern is chosen and lit lanterns are ignored', () => {
+test('nearest eligible lantern is chosen and a full lantern is ignored', () => {
   const world = build({
+    tuning: { ...TUNING, fuel_decay_per_s: 0 },
     scenario: {
       ...quiet,
       player: { pos: [0, 0, 0], carried: 10 },
       lanterns: [
-        { id: 'L1', pos: [0, 0, 1.5], lit: true },
+        { id: 'L1', pos: [0, 0, 0.5], lit: true },
         { id: 'L2', pos: [0, 0, 1.8] },
         { id: 'L3', pos: [0, 0, 1.2] },
       ],
@@ -323,13 +324,14 @@ test('dawn ends the night as a loss', () => {
   assert.equal(world.tick, 3);
 });
 
-test('lighting the last lantern wins and applies the standard end-of-night bonus', () => {
+test('lighting the last lantern waits for dawn and scores the remaining fuel', () => {
   const world = build({
     scenario: {
       ...quiet,
+      time_left_s: 0.05,
       player: { pos: [0, 0, 24], carried: 1 },
       lanterns: [
-        { id: 'L1', lit: true },
+        { id: 'L1', lit: true, pos: [0, 0, 15] },
         { id: 'L2', lit: true },
         { id: 'L3', lit: true },
         { id: 'L4', lit: true },
@@ -338,15 +340,12 @@ test('lighting the last lantern wins and applies the standard end-of-night bonus
     },
     frames: [{ tick: 0, interact: true }],
   });
-  const events = run(world, 1);
+  run(world, 1);
+  assert.equal(world.state, 'playing');
+  const events = run(world, 2);
   const over = events.find((e) => e.name === 'game_over');
-  assert.deepEqual(over.data, { result: 'won', reason: 'all_lit' });
-  const expected =
-    TUNING.score.per_mote +
-    TUNING.score.per_lantern +
-    299 * TUNING.score.per_second_left +
-    TUNING.flames * TUNING.score.per_flame_left;
-  assert.equal(world.score, expected);
+  assert.deepEqual(over.data, { result: 'won', reason: 'dawn_survived' });
+  assert.equal(world.score, 5 + 100 + 5 * (50 + 99) + 3 * 50);
 });
 
 test('camera yaw rotates the movement vector exactly as the contract specifies', () => {
@@ -669,8 +668,8 @@ test('snapshot fields and coordinate rounding follow the contract', () => {
   assert.deepEqual(snap.wind, { active: false, dir_deg: 0 });
 });
 
-test('shade states use only the v1.1 names', () => {
-  const allowed = new Set(['spawning', 'wander', 'chase', 'recoil', 'stunned']);
+test('shade states use only the v1.2 names', () => {
+  const allowed = new Set(['spawning', 'wander', 'chase', 'recoil', 'stunned', 'drain']);
   const world = build({});
   for (let i = 0; i < 900; i++) {
     stepWorld(world);
@@ -703,6 +702,6 @@ test('scenario validation rejects malformed data', () => {
 test('tuning in game.contract.json matches the simulation constants', async () => {
   const fs = await import('node:fs');
   const contract = JSON.parse(fs.readFileSync(new URL('../game.contract.json', import.meta.url), 'utf8'));
-  assert.equal(contract.contract_version, '1.1');
+  assert.equal(contract.contract_version, '1.2');
   assert.deepEqual(contract.tuning, JSON.parse(JSON.stringify(TUNING)));
 });
