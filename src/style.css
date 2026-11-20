@@ -7,8 +7,14 @@
   --violet: #b98cff;
   --mint: #8fd3ff;
   --charm: #ffd166;
-  --danger: #ff7d92;
+  --danger: #ff5a5f;
 }
+
+.accessible-palette { --danger: #ffffff; }
+.accessible-palette :is(.urgent, .warning, .banner.wind, .banner.drifter)::before {
+  content: '⚠ ';
+}
+.hud-middle .banner:is(.warning, .wind, .drifter) { color: var(--danger); }
 
 * {
   box-sizing: border-box;
@@ -69,6 +75,7 @@ body {
 .panel .value.urgent { color: var(--danger); animation: urgent-clock 1s infinite alternate; }
 .mote-meter { margin: 0 auto; width: max-content; }
 .mote-slot { border-radius: 3px; }
+.mote-slot[hidden] { display: none; }
 #deposit-hint { align-self: center; color: var(--warm-soft); font-weight: 600; }
 
 #lantern-arrow {

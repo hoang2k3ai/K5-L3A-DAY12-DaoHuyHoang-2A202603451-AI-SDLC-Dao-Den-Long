@@ -2,30 +2,32 @@
 //
 // Everything here is presentation only. The simulation never reads the DOM.
 import { TUNING } from '../sim/config.js';
+import { getMap } from '../sim/maps.js';
+import { carryCapacity, interactionLantern, lanternFuel, lanternGoal, lanternHasSafeZone, lightingCost } from '../sim/world.js';
 import { Vector3 } from 'three';
 
 const REASONS = {
   dawn: 'Trời đã sáng nhưng đảo vẫn chìm trong sương tối.',
   no_flames: 'Ánh sáng của Mây đã tắt hẳn.',
-  all_lit: 'Cả đảo đã bừng sáng.',
+  dawn_survived: 'Mây đã giữ đảo sáng tới bình minh.',
 };
 
 const NIGHT_TEXT = {
   1: {
     title: 'Đảo Bến',
-    subtitle: 'Đêm 1 · 5 phút',
+    subtitle: 'Đêm 1 · 4 phút',
     intro:
-      'Hòn đảo đầu tiên. Nhặt đom đóm, nạp đủ 10 con vào mỗi Đèn Lồng Lớn rồi thắp sáng cả năm ngọn đèn trước khi trời sáng.',
+      'Dầu trong đèn cạn dần. Giữ ít nhất ba ngọn đèn sáng tới bình minh, Mây nhé.',
   },
   2: {
     title: 'Đảo Cau',
-    subtitle: 'Đêm 2 · 5 phút 30',
+    subtitle: 'Đêm 2 · 4 phút 30',
     intro:
       'Hai hòn đảo nối bằng cầu và bệ phóng. Gió Lạc bắt đầu xuất hiện: giữ trên 5 đom đóm và nó sẽ đuổi theo bạn.',
   },
   3: {
     title: 'Đảo Chuông',
-    subtitle: 'Đêm 3 · 6 phút',
+    subtitle: 'Đêm 3 · 5 phút',
     intro:
       'Ruộng bậc thang, tháp chuông và những cơn Gió Lạc. Bóng Mực nhanh hơn, đừng để mất hết ánh sáng.',
   },
@@ -49,6 +51,7 @@ export function createHud() {
     objective: document.getElementById('objective'),
     hint: document.getElementById('hint'),
     wind: document.getElementById('wind-banner'),
+    fuel: document.getElementById('fuel-banner'),
     drifter: document.getElementById('drifter-banner'),
     flash: document.getElementById('flash'),
     overlay: document.getElementById('overlay'),
@@ -68,7 +71,7 @@ export function createHud() {
   let hintsVisible = true;
   const aim = new Vector3();
   const projected = new Vector3();
-  const slots = Array.from({ length: TUNING.carry_capacity }, () => {
+  const slots = Array.from({ length: TUNING.capacity_max }, () => {
     const slot = document.createElement('span');
     slot.className = 'pip mote-slot';
     el.moteSlots.appendChild(slot);
@@ -86,20 +89,22 @@ export function createHud() {
     const p = world.player;
     const left = Math.max(0, world.duration_s - world.sim_tick / 60);
     const lit = world.lanterns.filter((l) => l.lit).length;
+    const capacity = carryCapacity(world);
     const charmActive = p.charm_until > world.sim_tick;
 
     pips.forEach((pip, index) => pip.classList.toggle('off', index >= p.flames));
     el.nightLabel.textContent = `Đêm ${world.night} · ${world.map.name}`;
-    el.carried.textContent = `${p.carried}/${world.tuning.carry_capacity}`;
+    el.carried.textContent = `${p.carried}/${capacity}`;
     el.lanterns.textContent = `${lit}/${world.lanterns.length}`;
     el.score.textContent = world.score.toLocaleString('vi-VN');
     el.timer.textContent = formatTime(left);
     el.timer.classList.toggle('urgent', left <= 30);
-    slots.forEach((slot, index) => slot.classList.toggle('off', index >= p.carried));
+    slots.forEach((slot, index) => {
+      slot.hidden = index >= capacity;
+      slot.classList.toggle('off', index >= p.carried);
+    });
     let target = null;
     let nearest = Infinity;
-    let deposit = null;
-    let depositDistance = Infinity;
     for (const lantern of world.lanterns) {
       if (lantern.lit) continue;
       const horizontal = Math.hypot(lantern.x - p.x, lantern.z - p.z);
@@ -108,13 +113,14 @@ export function createHud() {
         target = lantern;
         nearest = distance;
       }
-      if (horizontal <= world.tuning.interact_radius && horizontal < depositDistance) {
-        deposit = lantern;
-        depositDistance = horizontal;
-      }
     }
+    const deposit = interactionLantern(world);
     el.depositHint.classList.toggle('hidden', !deposit || p.falling);
-    if (deposit) el.depositHint.textContent = `E — Nạp ánh sáng (${deposit.deposited}/${world.tuning.lantern_cost})`;
+    if (deposit) {
+      el.depositHint.textContent = deposit.lit
+        ? `E — Châm dầu (${lanternFuel(deposit).toFixed(1)}/${world.tuning.fuel_max})`
+        : `E — ${deposit.ever_lit ? 'Thắp lại' : 'Nạp ánh sáng'} (${deposit.deposited}/${lightingCost(world, deposit)})`;
+    }
     updateArrow(target, camera);
 
     const dashCd = Math.max(0, (p.dash_ready_at - world.sim_tick) / 60);
@@ -137,18 +143,11 @@ export function createHud() {
     el.drifter.classList.toggle('hidden', chasing === 0);
     if (chasing > 0) el.drifter.textContent = 'Gió Lạc đang đuổi theo bạn!';
 
-    const remaining = world.lanterns.length - lit;
-    if (performance.now() < toastUntil) {
-      return;
-    }
-    if (world.state === 'won') {
-      el.objective.textContent = 'Đảo đã sáng. Bạn có thể chơi lại hoặc sang đêm tiếp theo.';
-    } else if (world.state === 'lost') {
-      el.objective.textContent = 'Đêm nay đã khép lại.';
-    } else if (remaining === 0) {
-      el.objective.textContent = 'Đang kiểm tra ánh sáng cuối cùng…';
-    } else {
-      el.objective.textContent = `Còn ${remaining} Đèn Lồng Lớn. Mang đủ 10 đom đóm tới gần đèn và nhấn E.`;
+    const weak = world.lanterns.filter((l) => l.lit && !lanternHasSafeZone(world, l)).length;
+    el.fuel.classList.toggle('hidden', weak === 0);
+    if (weak > 0) el.fuel.textContent = `${weak} đèn sắp cạn dầu`;
+    if (performance.now() >= toastUntil) {
+      el.objective.textContent = `Giữ ít nhất ${lanternGoal(world)}/${world.lanterns.length} đèn sáng tới bình minh.`;
     }
     el.hint.classList.toggle('hidden', !hintsVisible);
   }
@@ -234,12 +233,13 @@ export function createHud() {
 
   function showIntro(night, onStart) {
     const info = NIGHT_TEXT[night];
+    const count = getMap(night).lanterns.length;
     openScreen('intro-card');
     add(`<p class="eyebrow">${info.subtitle}</p>`);
     add(`<h1>${info.title}</h1>`);
     add(`<p class="lede"><strong>Ông Đăng</strong> — “${info.intro}”</p>`);
     add(
-      `<p class="meta">Mục tiêu: thắp sáng toàn bộ ${night === 1 ? 5 : night === 2 ? 6 : 7} Đèn Lồng Lớn. Mỗi đèn cần 10 đom đóm.</p>`,
+      `<p class="meta">Giữ ${Math.ceil(TUNING.win_ratio * count)}/${count} đèn sáng tới bình minh. Nhấn E để nạp 10 đom đóm cho đèn mới, châm dầu hoặc thắp lại với 5 đom đóm.</p>`,
     );
     el.card.appendChild(actions(button('Bắt đầu', onStart, 'primary')));
   }
@@ -310,7 +310,16 @@ export function createHud() {
     });
     hintsRow.appendChild(hints);
 
-    form.append(volumeRow, muteRow, sensRow, hintsRow);
+    const paletteRow = document.createElement('label');
+    paletteRow.className = 'setting';
+    paletteRow.innerHTML = '<span>Bảng màu dễ phân biệt</span>';
+    const palette = document.createElement('input');
+    palette.type = 'checkbox';
+    palette.checked = settings.accessiblePalette;
+    palette.addEventListener('change', () => onChange({ accessiblePalette: palette.checked }));
+    paletteRow.appendChild(palette);
+
+    form.append(volumeRow, muteRow, sensRow, hintsRow, paletteRow);
     el.card.appendChild(form);
     el.card.appendChild(actions(button('Xong', onBack, 'primary')));
   }

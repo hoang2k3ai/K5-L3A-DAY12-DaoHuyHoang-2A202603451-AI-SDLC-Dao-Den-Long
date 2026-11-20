@@ -11,8 +11,8 @@ const sfx = createSfx();
 
 const NIGHTS = [1, 2, 3];
 const SETTINGS_KEY = 'dao-den-long:settings:v2';
-const BEST_KEY = 'dao-den-long:best:v2';
-const DEFAULT_SETTINGS = { volume: 0.7, muted: false, sensitivity: 1, hints: true };
+const BEST_KEY = 'dao-den-long:best:v3';
+const DEFAULT_SETTINGS = { volume: 0.7, muted: false, sensitivity: 1, hints: true, accessiblePalette: false };
 
 const keys = new Set();
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -65,6 +65,7 @@ function applySettings() {
   sfx.setVolume(settings.volume);
   sfx.setMuted(settings.muted);
   hud.setHintsVisible(settings.hints);
+  document.documentElement.classList.toggle('accessible-palette', settings.accessiblePalette);
 }
 
 function updateSettings(patch) {
@@ -240,7 +241,7 @@ function showResult() {
     won,
     reason: world.end_reason,
     score: world.score,
-    stats: `Đèn đã thắp: ${lit}/${world.lanterns.length} · Thời gian còn lại: ${mm}:${ss} · Ánh sáng: ${Math.max(0, world.player.flames)}/${world.tuning.flames}`,
+    stats: `Đèn còn sáng: ${lit}/${world.lanterns.length} · Thời gian còn lại: ${mm}:${ss} · Ánh sáng: ${Math.max(0, world.player.flames)}/${world.tuning.flames}`,
     nextNight: currentNight < 3 ? currentNight + 1 : null,
     onNext: () => showIntro(currentNight + 1),
     onReplay: () => beginNight(currentNight),
@@ -264,6 +265,12 @@ function handleEvent(event) {
       break;
     case 'lantern_lit':
       sfx.lantern();
+      break;
+    case 'refuel':
+      sfx.deposit();
+      break;
+    case 'lantern_out':
+      hud.toast(`${event.data.lantern_id} đã tắt. Nạp 5 đom đóm để thắp lại.`);
       break;
     case 'pulse':
       sfx.pulse();
@@ -296,7 +303,7 @@ function handleEvent(event) {
       break;
     case 'game_over':
       sfx.end(event.data.result === 'won');
-      if (event.data.reason === 'dawn') {
+      if (event.data.reason === 'dawn' || event.data.reason === 'dawn_survived') {
         screen = 'dawn';
         sfx.dawn();
         hud.showDawn(() => showResult());
@@ -428,7 +435,7 @@ function frame(now) {
   }
 
   if (world) {
-    stage.update(world, dt, { yaw, pitch, dist: distance });
+    stage.update(world, dt, { yaw, pitch, dist: distance, accessiblePalette: settings.accessiblePalette });
     if (screen === 'playing') hud.update(world, stage.camera);
   }
   stage.render();

@@ -5,6 +5,7 @@
 // surface must stay within 10% of these base values).
 import * as THREE from 'three';
 import { WORLD } from '../sim/config.js';
+import { lanternFuel, lanternHasSafeZone } from '../sim/world.js';
 
 export const PALETTE = Object.freeze({
   sky: 0x070a18,
@@ -23,7 +24,8 @@ export const PALETTE = Object.freeze({
   lanternBody: 0xffd9a0,
   mote: 0xffe9ad,
   shadeCore: 0x1b1026,
-  shadeGlow: 0xb98cff,
+  shadeGlow: 0x7a3cff,
+  shadeAccessible: 0x00b3ff,
   drifter: 0x8fd3ff,
   charm: 0xffd166,
   wind: 0xa8c8ff,
@@ -94,6 +96,27 @@ function makeLantern() {
   body.castShadow = true;
   group.add(body);
 
+  const tearShape = new THREE.Shape();
+  tearShape.moveTo(-0.12, 0.525);
+  tearShape.lineTo(0.15, 0.525);
+  tearShape.lineTo(0.02, 0.22);
+  tearShape.lineTo(0.13, 0.26);
+  tearShape.lineTo(-0.11, -0.22);
+  tearShape.lineTo(-0.02, 0.12);
+  tearShape.lineTo(-0.17, 0.08);
+  tearShape.closePath();
+  const tearGeometry = new THREE.ShapeGeometry(tearShape);
+  const tearMaterial = new THREE.MeshBasicMaterial({ color: 0x211916 });
+  const tears = new THREE.Group();
+  for (let side = 0; side < 4; side++) {
+    const angle = side * Math.PI / 2;
+    const tear = new THREE.Mesh(tearGeometry, tearMaterial);
+    tear.rotation.y = angle;
+    tear.position.set(Math.sin(angle) * 0.413, 0, Math.cos(angle) * 0.413);
+    tears.add(tear);
+  }
+  body.add(tears);
+
   const roof = new THREE.Mesh(
     new THREE.ConeGeometry(0.68, 0.5, 4),
     new THREE.MeshStandardMaterial({ color: 0x2b1d19, roughness: 0.9 }),
@@ -129,7 +152,17 @@ function makeLantern() {
   safeRing.position.y = 0.04;
   group.add(safeRing);
 
-  return { group, bodyMaterial, light, glow, safeRing };
+  const meter = new THREE.Group();
+  meter.position.y = 5.06;
+  const track = new THREE.Mesh(new THREE.PlaneGeometry(1.28, 0.19),
+    new THREE.MeshBasicMaterial({ color: 0x211916 }));
+  const fill = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.11),
+    new THREE.MeshBasicMaterial({ color: 0xffdc90 }));
+  fill.position.z = 0.01;
+  meter.add(track, fill);
+  group.add(meter);
+
+  return { group, body, bodyMaterial, roof, tears, light, glow, safeRing, meter, fill };
 }
 
 function makePlayer() {
@@ -211,7 +244,11 @@ function makeShade() {
     group.add(wisp);
   }
 
-  const eyeMaterial = new THREE.MeshBasicMaterial({ color: VIOLET });
+  const eyeMaterial = new THREE.MeshBasicMaterial({ color: VIOLET, toneMapped: false });
+  const outlineMaterial = new THREE.LineBasicMaterial({ color: VIOLET, toneMapped: false });
+  const outline = new THREE.LineSegments(new THREE.EdgesGeometry(core.geometry, 24), outlineMaterial);
+  outline.scale.setScalar(1.03);
+  group.add(outline);
   for (const x of [-0.16, 0.16]) {
     const eye = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), eyeMaterial);
     eye.position.set(x, 0.12, 0.46);
@@ -226,7 +263,7 @@ function makeShade() {
   stunRing.visible = false;
   group.add(stunRing);
 
-  return { group, coreMaterial, stunRing, core };
+  return { group, coreMaterial, eyeMaterial, outlineMaterial, stunRing, core };
 }
 
 function makeDrifter() {
@@ -761,12 +798,24 @@ export function createStage(container) {
     for (const data of world.lanterns) {
       const built = lanterns.get(data.id);
       if (!built) continue;
-      const target = data.lit ? 1.7 : 0.04;
+      const safe = lanternHasSafeZone(world, data);
+      const weak = data.lit && !safe;
+      const blink = weak ? 0.65 + 0.35 * Math.cos(world.sim_tick * Math.PI * 2 / 60) : 1;
+      const fuelRatio = lanternFuel(data) / world.tuning.fuel_max;
+      built.body.scale.setScalar(data.lit ? 1 : 0.8);
+      built.roof.position.y = data.lit ? 4.6 : 4.42;
+      built.tears.visible = !data.lit;
+      built.meter.visible = data.lit;
+      built.meter.quaternion.copy(camera.quaternion);
+      built.fill.scale.x = fuelRatio;
+      built.fill.position.x = (fuelRatio - 1) * 0.6;
+      built.fill.material.color.setScalar(blink);
+      const target = data.lit ? 1.7 * blink : 0.04;
       built.bodyMaterial.emissiveIntensity += (target - built.bodyMaterial.emissiveIntensity) * Math.min(1, dt * 5);
-      built.light.intensity += ((data.lit ? 52 : 0) - built.light.intensity) * Math.min(1, dt * 4);
-      built.glow.material.opacity += ((data.lit ? 0.7 : 0.16) - built.glow.material.opacity) * Math.min(1, dt * 4);
+      built.light.intensity += ((data.lit ? 52 * blink : 0) - built.light.intensity) * Math.min(1, dt * 4);
+      built.glow.material.opacity += ((data.lit ? 0.7 * blink : 0.16) - built.glow.material.opacity) * Math.min(1, dt * 4);
       built.glow.scale.setScalar((data.lit ? 4.6 : 1.1) + Math.sin(elapsed * 1.7 + data.x) * (data.lit ? 0.25 : 0.05));
-      built.safeRing.material.opacity += ((data.lit ? 0.18 : 0) - built.safeRing.material.opacity) * Math.min(1, dt * 3);
+      built.safeRing.material.opacity += ((safe ? 0.18 : 0) - built.safeRing.material.opacity) * Math.min(1, dt * 3);
     }
 
     // motes
@@ -806,6 +855,10 @@ export function createStage(container) {
         shades.set(data.id, mesh);
       }
       const stunned = data.state === 'stunned';
+      const shadeColor = view.accessiblePalette ? PALETTE.shadeAccessible : VIOLET;
+      mesh.eyeMaterial.color.setHex(shadeColor);
+      mesh.outlineMaterial.color.setHex(shadeColor);
+      mesh.stunRing.material.color.setHex(shadeColor);
       const spawning = data.state === 'spawning';
       const opacity = spawning ? 0.45 : 1;
       mesh.group.scale.setScalar(spawning ? 0.6 + 0.4 * (1 - data.state_ticks_left / 30) : 1);
