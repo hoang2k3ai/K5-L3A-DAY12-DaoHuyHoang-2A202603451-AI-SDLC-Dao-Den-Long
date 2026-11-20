@@ -3,7 +3,8 @@ import { getMap } from './sim/maps.js';
 import { createStage } from './render/scene.js';
 import { createHud } from './render/hud.js';
 import { createSfx } from './render/sfx.js';
-import { moveFromKeys } from './input.js';
+import { DEFAULT_BINDINGS, moveFromKeys } from './input.js';
+import { readLeaderboard, saveLeaderboard } from './leaderboard-store.js';
 
 const stage = createStage(document.getElementById('app'));
 const hud = createHud();
@@ -12,7 +13,10 @@ const sfx = createSfx();
 const NIGHTS = [1, 2, 3];
 const SETTINGS_KEY = 'dao-den-long:settings:v2';
 const BEST_KEY = 'dao-den-long:best:v3';
-const DEFAULT_SETTINGS = { volume: 0.7, muted: false, sensitivity: 1, hints: true, accessiblePalette: false };
+const DEFAULT_SETTINGS = {
+  volume: 0.7, muted: false, sensitivity: 1, hints: true, accessiblePalette: false,
+  bindings: DEFAULT_BINDINGS, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches, largeText: false,
+};
 
 const keys = new Set();
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -37,6 +41,7 @@ let countdown = 11;
 let nextMusicTick = 0;
 const nightScores = new Map();
 let resultShown = false;
+let runSeed = 0;
 
 const params = new URLSearchParams(window.location.search);
 const photoMode = params.has('photo');
@@ -66,6 +71,9 @@ function applySettings() {
   sfx.setMuted(settings.muted);
   hud.setHintsVisible(settings.hints);
   document.documentElement.classList.toggle('accessible-palette', settings.accessiblePalette);
+  document.documentElement.classList.toggle('reduced-motion', settings.reducedMotion);
+  document.documentElement.classList.toggle('large-text', settings.largeText);
+  hud.setBindings(settings.bindings);
 }
 
 function updateSettings(patch) {
@@ -125,6 +133,7 @@ function showMenu() {
   resultShown = false;
   keys.clear();
   nightScores.clear();
+  runSeed = Math.floor(Math.random() * 0x100000000);
   hud.showHud(false);
   if (!world) world = newWorld(1, 12345);
   hud.showMenu({
@@ -132,6 +141,10 @@ function showMenu() {
     best,
     onSelect: () => showIntro(1),
     onSettings: () => openSettings('menu'),
+    onLeaderboard: () => {
+      screen = 'leaderboard';
+      hud.showLeaderboard(readLeaderboard(), showMenu);
+    },
   });
 }
 
@@ -147,12 +160,13 @@ function beginNight(night) {
   sfx.unlock();
   currentNight = night;
   resultShown = false;
-  world = newWorld(night);
+  world = newWorld(night, runSeed + night - 1);
   cameraDefaults(night);
   accumulator = 0;
   windWarning = false;
   countdown = 11;
   nextMusicTick = 0;
+  hud.shadeSpawn(null, 0);
   keys.clear();
   hud.closeScreen();
   hud.showHud(true);
@@ -196,7 +210,7 @@ function openSettings(from) {
   settingsReturn = from;
   const previous = screen;
   screen = 'settings';
-  hud.showSettings(settings, updateSettings, () => {
+  hud.showSettings(() => settings, updateSettings, () => {
     if (settingsReturn === 'paused') {
       screen = 'paused';
       hud.showPause({
@@ -224,6 +238,7 @@ function showResult() {
   const ss = String(seconds % 60).padStart(2, '0');
   if (won) nightScores.set(currentNight, world.score);
   const total = [...nightScores.values()].reduce((sum, score) => sum + score, 0);
+  const onSave = (name) => saveLeaderboard({ name, score: total, nights_won: nightScores.size, seed: runSeed });
   if (won && currentNight === 3) {
     if (total > best) {
       best = total;
@@ -233,7 +248,7 @@ function showResult() {
         /* ignore */
       }
     }
-    hud.showSunrise(total, showMenu);
+    hud.showSunrise(total, showMenu, onSave);
     return;
   }
   hud.showResult({
@@ -246,6 +261,8 @@ function showResult() {
     onNext: () => showIntro(currentNight + 1),
     onReplay: () => beginNight(currentNight),
     onMenu: showMenu,
+    onSave: won ? null : onSave,
+    total,
   });
 }
 
@@ -291,10 +308,11 @@ function handleEvent(event) {
       break;
     case 'player_hit':
       sfx.hit();
-      hud.flash();
+      if (!settings.reducedMotion) hud.flash();
       break;
     case 'shade_spawned':
       sfx.spawn();
+      hud.shadeSpawn(world.shades.find((shade) => shade.id === event.data.id), world.sim_tick);
       break;
     case 'paused':
       sfx.pause();
@@ -306,7 +324,8 @@ function handleEvent(event) {
       if (event.data.reason === 'dawn' || event.data.reason === 'dawn_survived') {
         screen = 'dawn';
         sfx.dawn();
-        hud.showDawn(() => showResult());
+        if (settings.reducedMotion) showResult();
+        else hud.showDawn(() => showResult());
       } else {
         showResult();
       }
@@ -318,42 +337,48 @@ function handleEvent(event) {
 
 /* -------------------------------- input ------------------------------- */
 
+function isDown(action) {
+  return settings.bindings[action].some((code) => keys.has(code));
+}
+
 function inputState() {
-  const forward =
-    (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) -
-    (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0);
-  const strafe =
-    (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) -
-    (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
+  const forward = Number(isDown('up')) - Number(isDown('down'));
+  const strafe = Number(isDown('right')) - Number(isDown('left'));
   return {
     move: moveFromKeys(forward, strafe),
     cam_yaw_deg: (yaw * 180) / Math.PI,
-    jump: keys.has('Space'),
-    interact: keys.has('KeyE'),
-    pulse: keys.has('KeyQ'),
-    dash: keys.has('ShiftLeft') || keys.has('ShiftRight'),
+    jump: isDown('jump'),
+    interact: isDown('interact'),
+    pulse: isDown('pulse'),
+    dash: isDown('dash'),
   };
 }
 
 window.addEventListener('keydown', (event) => {
-  if (event.code === 'Space') event.preventDefault();
-  sfx.unlock();
+  if (event.target instanceof HTMLInputElement || event.defaultPrevented) return;
 
-  if (event.code === 'Escape' || event.code === 'KeyP') {
+  if (settings.bindings.pause.includes(event.code) && (screen === 'playing' || screen === 'paused')) {
+    event.preventDefault();
     if (event.repeat) return;
     if (screen === 'playing') enterPause();
     else if (screen === 'paused') resumeGame();
     return;
   }
-  if (event.code === 'KeyM') {
+  const bound = Object.values(settings.bindings).some((codes) => codes.includes(event.code));
+  if (screen === 'playing' && bound) {
+    event.preventDefault();
+    sfx.unlock();
+    keys.add(event.code);
+    return;
+  }
+  if (event.code === 'KeyM' && !bound) {
     updateSettings({ muted: !settings.muted });
     return;
   }
-  if (event.code === 'KeyR' && (screen === 'playing' || screen === 'paused' || screen === 'result')) {
+  if (event.code === 'KeyR' && !bound && (screen === 'playing' || screen === 'paused' || screen === 'result')) {
     beginNight(currentNight);
     return;
   }
-  keys.add(event.code);
 });
 
 window.addEventListener('keyup', (event) => {
@@ -435,7 +460,8 @@ function frame(now) {
   }
 
   if (world) {
-    stage.update(world, dt, { yaw, pitch, dist: distance, accessiblePalette: settings.accessiblePalette });
+    stage.update(world, dt, { yaw, pitch, dist: distance,
+      accessiblePalette: settings.accessiblePalette, reducedMotion: settings.reducedMotion });
     if (screen === 'playing') hud.update(world, stage.camera);
   }
   stage.render();
@@ -448,7 +474,10 @@ if (photoMode) {
 } else {
   world = newWorld(1, 12345);
   const playParam = Number(params.get('play'));
-  if (NIGHTS.includes(playParam)) beginNight(playParam);
+  if (NIGHTS.includes(playParam)) {
+    runSeed = Math.floor(Math.random() * 0x100000000);
+    beginNight(playParam);
+  }
   else showMenu();
 }
 requestAnimationFrame(frame);

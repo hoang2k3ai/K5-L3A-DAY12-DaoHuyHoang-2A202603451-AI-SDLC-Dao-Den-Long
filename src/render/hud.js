@@ -5,6 +5,8 @@ import { TUNING } from '../sim/config.js';
 import { getMap } from '../sim/maps.js';
 import { carryCapacity, interactionLantern, lanternFuel, lanternGoal, lanternHasSafeZone, lightingCost } from '../sim/world.js';
 import { Vector3 } from 'three';
+import { ACTIONS, DEFAULT_BINDINGS, bindingConflict, keyLabel } from '../input.js';
+import { validName } from '../leaderboard.js';
 
 const REASONS = {
   dawn: 'Trời đã sáng nhưng đảo vẫn chìm trong sương tối.',
@@ -42,6 +44,9 @@ export function createHud() {
     moteSlots: document.getElementById('mote-slots'),
     depositHint: document.getElementById('deposit-hint'),
     arrow: document.getElementById('lantern-arrow'),
+    shadeArrow: document.getElementById('shade-arrow'),
+    shadeBanner: document.getElementById('shade-banner'),
+    countdown: document.getElementById('countdown-banner'),
     lanterns: document.getElementById('lanterns'),
     score: document.getElementById('score'),
     timer: document.getElementById('timer'),
@@ -69,6 +74,10 @@ export function createHud() {
 
   let toastUntil = 0;
   let hintsVisible = true;
+  let bindings = DEFAULT_BINDINGS;
+  let spawnTarget;
+  let spawnUntil = 0;
+  const key = (action) => keyLabel(bindings[action][0]);
   const aim = new Vector3();
   const projected = new Vector3();
   const slots = Array.from({ length: TUNING.capacity_max }, () => {
@@ -118,10 +127,17 @@ export function createHud() {
     el.depositHint.classList.toggle('hidden', !deposit || p.falling);
     if (deposit) {
       el.depositHint.textContent = deposit.lit
-        ? `E — Châm dầu (${lanternFuel(deposit).toFixed(1)}/${world.tuning.fuel_max})`
-        : `E — ${deposit.ever_lit ? 'Thắp lại' : 'Nạp ánh sáng'} (${deposit.deposited}/${lightingCost(world, deposit)})`;
+        ? `${key('interact')} — Châm dầu (${lanternFuel(deposit).toFixed(1)}/${world.tuning.fuel_max})`
+        : `${key('interact')} — ${deposit.ever_lit ? 'Thắp lại' : 'Nạp ánh sáng'} (${deposit.deposited}/${lightingCost(world, deposit)})`;
     }
-    updateArrow(target, camera);
+    updateArrow(el.arrow, target, camera);
+    const showSpawn = spawnTarget && world.sim_tick < spawnUntil;
+    updateArrow(el.shadeArrow, showSpawn ? spawnTarget : null, camera, true);
+    el.shadeBanner.classList.toggle('hidden', !showSpawn);
+    const seconds = Math.ceil(left);
+    el.countdown.classList.toggle('hidden', !(seconds > 0 && seconds <= 10));
+    const countdown = `Bình minh sau ${seconds} giây`;
+    if (seconds > 0 && seconds <= 10 && el.countdown.textContent !== countdown) el.countdown.textContent = countdown;
 
     const dashCd = Math.max(0, (p.dash_ready_at - world.sim_tick) / 60);
     el.dash.textContent = charmActive ? 'sẵn sàng' : dashCd > 0 ? `${dashCd.toFixed(1)}s` : 'sẵn sàng';
@@ -152,21 +168,24 @@ export function createHud() {
     el.hint.classList.toggle('hidden', !hintsVisible);
   }
 
-  function updateArrow(target, camera) {
-    el.arrow.classList.add('hidden');
+  function updateArrow(element, target, camera, always = false) {
+    element.classList.add('hidden');
     if (!target) return;
     camera.updateMatrixWorld();
-    aim.set(target.x, target.y + 1, target.z).applyMatrix4(camera.matrixWorldInverse);
+    aim.set(target.x, (target.y ?? target.baseY) + 1, target.z).applyMatrix4(camera.matrixWorldInverse);
     projected.copy(aim).applyMatrix4(camera.projectionMatrix);
-    if (aim.z < 0 && Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1) return;
+    if (!always && aim.z < 0 && Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1) return;
     const sign = aim.z < 0 ? 1 : -1;
     const x = projected.x * sign;
     const y = -projected.y * sign;
     const angle = Number.isFinite(x + y) && Math.hypot(x, y) > 0.001 ? Math.atan2(x, -y) : Math.PI;
-    el.arrow.style.left = `${50 + Math.sin(angle) * 42}%`;
-    el.arrow.style.top = `${50 - Math.cos(angle) * 34}%`;
-    el.arrow.style.transform = `translate(-50%, -50%) rotate(${angle}rad)`;
-    el.arrow.classList.remove('hidden');
+    const dx = Math.sin(angle);
+    const dy = -Math.cos(angle);
+    const edge = Math.max(Math.abs(dx), Math.abs(dy));
+    element.style.left = `${50 + dx / edge * 45}%`;
+    element.style.top = `${50 + dy / edge * 38}%`;
+    element.style.transform = `translate(-50%, -50%) rotate(${angle}rad)`;
+    element.classList.remove('hidden');
   }
 
   /* ------------------------- screens ------------------------- */
@@ -210,7 +229,7 @@ export function createHud() {
     return row;
   }
 
-  function showMenu({ nights, onSelect, onSettings, best }) {
+  function showMenu({ nights, onSelect, onSettings, onLeaderboard, best }) {
     openScreen('menu-card');
     add(`<p class="eyebrow">Đảo Đèn Lồng</p>`);
     add(`<h1>Ba hòn đảo, ba đêm</h1>`);
@@ -228,7 +247,8 @@ export function createHud() {
     }
     el.card.appendChild(list);
     if (best > 0) add(`<p class="meta">Kỷ lục hiện tại: ${best.toLocaleString('vi-VN')} điểm</p>`);
-    el.card.appendChild(actions(button('Bắt đầu', onSelect, 'primary'), button('Cài đặt', onSettings, 'ghost')));
+    el.card.appendChild(actions(button('Bắt đầu', onSelect, 'primary'),
+      button('Bảng xếp hạng', onLeaderboard), button('Cài đặt', onSettings, 'ghost')));
   }
 
   function showIntro(night, onStart) {
@@ -239,7 +259,7 @@ export function createHud() {
     add(`<h1>${info.title}</h1>`);
     add(`<p class="lede"><strong>Ông Đăng</strong> — “${info.intro}”</p>`);
     add(
-      `<p class="meta">Giữ ${Math.ceil(TUNING.win_ratio * count)}/${count} đèn sáng tới bình minh. Nhấn E để nạp 10 đom đóm cho đèn mới, châm dầu hoặc thắp lại với 5 đom đóm.</p>`,
+      `<p class="meta">Giữ ${Math.ceil(TUNING.win_ratio * count)}/${count} đèn sáng tới bình minh. Nhấn ${key('interact')} để nạp 10 đom đóm cho đèn mới, châm dầu hoặc thắp lại với 5 đom đóm.</p>`,
     );
     el.card.appendChild(actions(button('Bắt đầu', onStart, 'primary')));
   }
@@ -259,7 +279,8 @@ export function createHud() {
     );
   }
 
-  function showSettings(settings, onChange, onBack) {
+  function showSettings(getSettings, onChange, onBack) {
+    const settings = getSettings();
     openScreen('settings-card');
     add(`<p class="eyebrow">Cài đặt</p>`);
     add(`<h1>Tuỳ chỉnh</h1>`);
@@ -320,11 +341,106 @@ export function createHud() {
     paletteRow.appendChild(palette);
 
     form.append(volumeRow, muteRow, sensRow, hintsRow, paletteRow);
+    for (const [name, label] of [['reducedMotion', 'Giảm chuyển động'], ['largeText', 'Chữ lớn (×1,25)']]) {
+      const row = document.createElement('label');
+      row.className = 'setting';
+      const toggle = document.createElement('input');
+      toggle.type = 'checkbox';
+      toggle.checked = settings[name];
+      toggle.addEventListener('change', () => onChange({ [name]: toggle.checked }));
+      row.append(label, toggle);
+      form.appendChild(row);
+    }
     el.card.appendChild(form);
-    el.card.appendChild(actions(button('Xong', onBack, 'primary')));
+    el.card.appendChild(actions(button('Đổi phím', () => showBindings(onChange, () =>
+      showSettings(getSettings, onChange, onBack))), button('Xong', onBack, 'primary')));
   }
 
-  function showResult({ night, won, reason, score, stats, nextNight, onNext, onReplay, onMenu }) {
+  function showBindings(onChange, onBack) {
+    openScreen('bindings-card');
+    add('<h1>Đổi phím</h1>');
+    const status = add('<p class="meta key-status" role="status">Chọn hành động rồi nhấn phím mới.</p>');
+    const list = document.createElement('div');
+    list.className = 'key-list';
+    let waiting;
+    const labels = new Map();
+    const refresh = () => {
+      for (const [action, control] of labels) {
+        control.textContent = `${ACTIONS[action]} · ${bindings[action].map(keyLabel).join(' / ')}`;
+      }
+    };
+    for (const action of Object.keys(ACTIONS)) {
+      const control = button('', () => {
+        waiting = action;
+        status.textContent = `Nhấn phím mới cho ${ACTIONS[action]}.`;
+      });
+      control.addEventListener('keydown', (event) => {
+        if (waiting !== action || event.code === 'Tab' || !event.code || event.repeat) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const conflict = bindingConflict(bindings, action, event.code);
+        if (conflict) {
+          status.textContent = `${keyLabel(event.code)} đã dùng cho ${ACTIONS[conflict]}.`;
+          return;
+        }
+        waiting = null;
+        onChange({ bindings: { ...bindings, [action]: [event.code] } });
+        refresh();
+        status.textContent = `Đã đổi phím ${ACTIONS[action]}.`;
+      });
+      control.addEventListener('blur', () => { if (waiting === action) waiting = null; });
+      labels.set(action, control);
+      list.appendChild(control);
+    }
+    refresh();
+    el.card.appendChild(list);
+    el.card.appendChild(actions(button('Khôi phục mặc định', () => {
+      waiting = null;
+      onChange({ bindings: DEFAULT_BINDINGS });
+      refresh();
+      status.textContent = 'Đã khôi phục phím mặc định.';
+    }), button('Xong', onBack, 'primary')));
+  }
+
+  function scoreForm(onSave) {
+    const form = add('<form class="score-form"><label>Tên <input required minlength="3" maxlength="12" pattern="[A-Za-z0-9_]{3,12}" autocomplete="nickname"></label><button type="submit">Lưu điểm</button><p class="meta" role="status">3–12 ký tự chữ, số hoặc dấu gạch dưới.</p></form>');
+    const input = form.querySelector('input');
+    const submit = form.querySelector('button');
+    const status = form.querySelector('p');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (submit.disabled || !validName(input.value)) return;
+      submit.disabled = true;
+      try {
+        await onSave(input.value);
+        input.disabled = true;
+        status.textContent = 'Đã ghi nhận kết quả.';
+      } catch (error) {
+        status.textContent = error.message;
+        submit.disabled = false;
+      }
+    });
+  }
+
+  function showLeaderboard(entries, onBack) {
+    openScreen('leaderboard-card');
+    add('<h1>Bảng xếp hạng</h1>');
+    const content = add('<div class="ranking" aria-live="polite">Đang đọc bảng điểm…</div>');
+    entries.then((scores) => {
+      content.textContent = scores.length ? '' : 'Chưa có điểm được lưu.';
+      if (!scores.length) return;
+      const list = document.createElement('ol');
+      for (const entry of scores) {
+        const row = document.createElement('li');
+        row.textContent = `${entry.name} · ${entry.score.toLocaleString('vi-VN')} điểm · ${entry.nights_won}/3 đêm`;
+        list.appendChild(row);
+      }
+      content.appendChild(list);
+    }).catch((error) => { content.textContent = error.message; });
+    el.card.appendChild(actions(button('Về menu', onBack, 'primary')));
+  }
+
+  function showResult({ night, won, reason, score, stats, nextNight, onNext, onReplay, onMenu, onSave, total }) {
     openScreen(won ? 'result-card won' : 'result-card lost');
     add(`<p class="eyebrow">Đêm ${night} · ${NIGHT_TEXT[night].title}</p>`);
     add(`<h1>${won ? 'Đảo đã sáng' : 'Sương đen thắng rồi'}</h1>`);
@@ -333,6 +449,10 @@ export function createHud() {
       `<p class="stats">Điểm: <strong>${score.toLocaleString('vi-VN')}</strong><br />${stats}</p>`,
     );
     const buttons = [];
+    if (onSave) {
+      add(`<p class="meta">Tổng điểm các đêm đã thắng: ${total.toLocaleString('vi-VN')}</p>`);
+      scoreForm(onSave);
+    }
     if (won && nextNight) buttons.push(button(`Sang đêm ${nextNight}`, onNext, 'primary'));
     buttons.push(button(won ? 'Chơi lại đêm này' : 'Thử lại', onReplay, won && nextNight ? '' : 'primary'));
     buttons.push(button('Về menu', onMenu, 'ghost'));
@@ -350,10 +470,11 @@ export function createHud() {
     }, 2200);
   }
 
-  function showSunrise(total, onMenu) {
+  function showSunrise(total, onMenu, onSave) {
     openScreen('result-card won');
     add('<h1>Bình Minh</h1>');
     add(`<p class="stats">Tổng điểm <strong>${total.toLocaleString('vi-VN')}</strong></p>`);
+    scoreForm(onSave);
     el.card.appendChild(actions(button('Về menu', onMenu, 'primary')));
   }
 
@@ -379,6 +500,15 @@ export function createHud() {
     showResult,
     showDawn,
     showSunrise,
+    showLeaderboard,
+    shadeSpawn(shade, tick) {
+      spawnTarget = shade;
+      spawnUntil = tick + 180;
+    },
+    setBindings(newBindings) {
+      bindings = newBindings;
+      el.hint.textContent = `${key('up')}/${key('left')}/${key('down')}/${key('right')} di chuyển · ${key('jump')} nhảy · ${key('dash')} lướt · ${key('interact')} nạp đèn · ${key('pulse')} Tỏa Sáng · ${key('pause')} tạm dừng`;
+    },
     closeScreen,
     showHud(visible) {
       el.hud.classList.toggle('hidden', !visible);

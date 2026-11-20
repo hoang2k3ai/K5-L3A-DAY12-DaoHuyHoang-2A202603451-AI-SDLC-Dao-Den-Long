@@ -11,3 +11,26 @@
 export function moveFromKeys(forward, strafe) {
   return [-strafe, forward];
 }
+
+export const ACTIONS = Object.freeze({
+  up: 'Tiến', down: 'Lùi', left: 'Trái', right: 'Phải', jump: 'Nhảy',
+  dash: 'Lướt', interact: 'Tương tác', pulse: 'Tỏa Sáng', pause: 'Tạm dừng',
+});
+
+export const DEFAULT_BINDINGS = Object.freeze({
+  up: ['KeyW', 'ArrowUp'], down: ['KeyS', 'ArrowDown'],
+  left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
+  jump: ['Space'], dash: ['ShiftLeft', 'ShiftRight'],
+  interact: ['KeyE'], pulse: ['KeyQ'], pause: ['Escape', 'KeyP'],
+});
+
+export function bindingConflict(bindings, action, code) {
+  return Object.keys(ACTIONS).find((other) => other !== action && bindings[other].includes(code));
+}
+
+export function keyLabel(code) {
+  return ({
+    Space: 'Space', Escape: 'Esc', ShiftLeft: 'Shift trái', ShiftRight: 'Shift phải',
+    ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
+  })[code] ?? code.replace(/^(Key|Digit)/, '');
+}

@@ -1,4 +1,5 @@
 :root {
+  font-size: 18px;
   --ink: #070a18;
   --ink-soft: #0d1226;
   --warm: #ffb45e;
@@ -9,6 +10,22 @@
   --charm: #ffd166;
   --danger: #ff5a5f;
 }
+
+:root.large-text { font-size: 22.5px; }
+.reduced-motion *, .reduced-motion *::before { animation: none !important; transition: none !important; }
+#shade-arrow { position: absolute; color: var(--danger); font-size: 1.55rem; text-shadow: 0 0 8px #000; }
+.warning { background: #181424; border: 1px solid var(--danger); }
+.key-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.key-status { min-height: 2lh; }
+.score-form { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.score-form input { font: inherit; width: 10ch; background: var(--ink); color: var(--paper); border: 1px solid var(--warm); border-radius: 6px; padding: 6px; }
+.score-form .meta { flex-basis: 100%; margin: 0; }
+.ranking { text-align: left; }
+.ranking li { padding: 5px 0; }
+.settings-card { max-height: calc(100dvh - 40px); overflow: auto; }
+.settings-card .settings { gap: 7px; }
+.settings-card .setting { padding-block: 6px; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--mint); outline-offset: 2px; }
 
 .accessible-palette { --danger: #ffffff; }
 .accessible-palette :is(.urgent, .warning, .banner.wind, .banner.drifter)::before {
@@ -81,7 +98,7 @@ body {
 #lantern-arrow {
   position: absolute;
   color: var(--warm-soft);
-  font-size: 28px;
+  font-size: 1.556rem;
   text-shadow: 0 0 12px var(--warm);
 }
 
@@ -97,7 +114,7 @@ body {
   border: 1px solid rgba(255, 200, 130, 0.18);
   backdrop-filter: blur(6px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
-  font-size: 13.5px;
+  font-size: 1.000rem;
 }
 
 .panel.night {
@@ -106,7 +123,7 @@ body {
 
 .panel .label {
   color: rgba(246, 236, 216, 0.6);
-  font-size: 11.5px;
+  font-size: 1.000rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -157,7 +174,7 @@ body {
 .banner {
   padding: 8px 18px;
   border-radius: 999px;
-  font-size: 14px;
+  font-size: 1.000rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   backdrop-filter: blur(6px);
@@ -198,12 +215,12 @@ body {
 }
 
 .hint {
-  font-size: 12.5px;
+  font-size: 1.000rem;
   color: rgba(246, 236, 216, 0.55);
 }
 
 .objective {
-  font-size: 14px;
+  font-size: 1.000rem;
   color: rgba(255, 216, 160, 0.85);
 }
 
@@ -291,7 +308,7 @@ body {
 
 .card h1 {
   margin: 0 0 10px;
-  font-size: 29px;
+  font-size: 1.611rem;
   letter-spacing: 0.01em;
   color: var(--warm-soft);
   text-shadow: 0 0 26px rgba(255, 160, 70, 0.4);
@@ -304,7 +321,7 @@ body {
 
 .eyebrow {
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: 1.000rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: rgba(143, 211, 255, 0.75);
@@ -314,12 +331,12 @@ body {
   margin: 0 0 18px;
   color: rgba(246, 236, 216, 0.75);
   line-height: 1.65;
-  font-size: 14.5px;
+  font-size: 1.000rem;
 }
 
 .meta {
   margin: 12px 0 0;
-  font-size: 12.5px;
+  font-size: 1.000rem;
   color: rgba(246, 236, 216, 0.5);
 }
 
@@ -327,12 +344,12 @@ body {
   margin: 0 0 20px;
   line-height: 1.8;
   color: rgba(246, 236, 216, 0.78);
-  font-size: 14px;
+  font-size: 1.000rem;
 }
 
 .stats strong {
   color: var(--warm-soft);
-  font-size: 20px;
+  font-size: 1.111rem;
 }
 
 .night-list {
@@ -363,20 +380,20 @@ body {
 }
 
 .night-no {
-  font-size: 11px;
+  font-size: 1.000rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(143, 211, 255, 0.8);
 }
 
 .night-name {
-  font-size: 17px;
+  font-size: 1.000rem;
   font-weight: 700;
   color: var(--warm-soft);
 }
 
 .night-time {
-  font-size: 11.5px;
+  font-size: 1.000rem;
   color: rgba(246, 236, 216, 0.5);
 }
 
@@ -396,7 +413,7 @@ body {
   border: 1px solid rgba(255, 200, 130, 0.32);
   background: rgba(255, 255, 255, 0.06);
   color: var(--paper);
-  font-size: 14px;
+  font-size: 1.000rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
@@ -440,7 +457,7 @@ body {
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.07);
-  font-size: 14px;
+  font-size: 1.000rem;
   color: rgba(246, 236, 216, 0.82);
 }
 
@@ -461,7 +478,7 @@ body {
   }
   .panel {
     padding: 6px 9px;
-    font-size: 12px;
+    font-size: 1.000rem;
   }
   .panel .label {
     display: none;
