@@ -1,4 +1,4 @@
-// Validation for the two JSON inputs of the Test Contract v1.0.
+// Validation for the two JSON inputs of Test Contract v1.1.
 // Any malformed file must make the headless run exit with code 2.
 
 export class ContractError extends Error {
@@ -12,6 +12,9 @@ const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v)
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const isInt = (v) => Number.isInteger(v);
 
+const SHADE_STATES = ['spawning', 'wander', 'chase', 'recoil', 'stunned'];
+const DRIFTER_STATES = ['idle', 'chase', 'flee', 'removed'];
+
 function fail(where, msg) {
   throw new ContractError(`${where}: ${msg}`);
 }
@@ -20,6 +23,10 @@ function checkVec3(where, v) {
   if (!Array.isArray(v) || v.length !== 3 || !v.every(isNum)) {
     fail(where, 'phải là mảng 3 số [x, y, z]');
   }
+}
+
+function checkTicks(where, v) {
+  if (!isNum(v) || v < 0) fail(where, 'phải là số >= 0');
 }
 
 /** Parse + validate a scenario object (section D of the contract). */
@@ -45,10 +52,16 @@ export function parseScenario(raw) {
       if (!isNum(p.flames) || p.flames < 0) fail('scenario.player.flames', 'phải là số >= 0');
       player.flames = p.flames;
     }
+    for (const key of ['invuln_ticks', 'dash_cd_ticks', 'pulse_cd_ticks', 'charm_ticks']) {
+      if (p[key] !== undefined) {
+        checkTicks(`scenario.player.${key}`, p[key]);
+        player[key] = p[key];
+      }
+    }
     out.player = player;
   }
 
-  for (const key of ['random_motes', 'random_shades']) {
+  for (const key of ['random_motes', 'random_shades', 'random_drifters', 'wind_enabled']) {
     if (raw[key] !== undefined) {
       if (typeof raw[key] !== 'boolean') fail(`scenario.${key}`, 'phải là boolean');
       out[key] = raw[key];
@@ -69,13 +82,77 @@ export function parseScenario(raw) {
     out.shades = raw.shades.map((s, i) => {
       if (!isObject(s)) fail(`scenario.shades[${i}]`, 'phải là object');
       checkVec3(`scenario.shades[${i}].pos`, s.pos);
-      const id = s.id === undefined ? undefined : s.id;
-      if (id !== undefined && typeof id !== 'string') fail(`scenario.shades[${i}].id`, 'phải là chuỗi');
-      if (id !== undefined) {
-        if (seen.has(id)) fail(`scenario.shades[${i}].id`, `id trùng "${id}"`);
-        seen.add(id);
+      const item = { pos: s.pos };
+      if (s.id !== undefined) {
+        if (typeof s.id !== 'string') fail(`scenario.shades[${i}].id`, 'phải là chuỗi');
+        if (seen.has(s.id)) fail(`scenario.shades[${i}].id`, `id trùng "${s.id}"`);
+        seen.add(s.id);
+        item.id = s.id;
       }
-      return { pos: s.pos, id };
+      if (s.state !== undefined) {
+        if (!SHADE_STATES.includes(s.state)) {
+          fail(`scenario.shades[${i}].state`, `phải là một trong ${SHADE_STATES.join(', ')}`);
+        }
+        item.state = s.state;
+      }
+      if (s.state_ticks_left !== undefined) {
+        checkTicks(`scenario.shades[${i}].state_ticks_left`, s.state_ticks_left);
+        item.state_ticks_left = s.state_ticks_left;
+      }
+      return item;
+    });
+  }
+
+  if (raw.drifters !== undefined) {
+    if (!Array.isArray(raw.drifters)) fail('scenario.drifters', 'phải là mảng');
+    const seen = new Set();
+    out.drifters = raw.drifters.map((d, i) => {
+      if (!isObject(d)) fail(`scenario.drifters[${i}]`, 'phải là object');
+      checkVec3(`scenario.drifters[${i}].pos`, d.pos);
+      const item = { pos: d.pos };
+      if (d.id !== undefined) {
+        if (typeof d.id !== 'string') fail(`scenario.drifters[${i}].id`, 'phải là chuỗi');
+        if (seen.has(d.id)) fail(`scenario.drifters[${i}].id`, `id trùng "${d.id}"`);
+        seen.add(d.id);
+        item.id = d.id;
+      }
+      if (d.state !== undefined) {
+        if (!DRIFTER_STATES.includes(d.state)) {
+          fail(`scenario.drifters[${i}].state`, `phải là một trong ${DRIFTER_STATES.join(', ')}`);
+        }
+        item.state = d.state;
+      }
+      if (d.state_ticks_left !== undefined) {
+        checkTicks(`scenario.drifters[${i}].state_ticks_left`, d.state_ticks_left);
+        item.state_ticks_left = d.state_ticks_left;
+      }
+      if (d.stolen !== undefined) {
+        if (!isInt(d.stolen) || d.stolen < 0) fail(`scenario.drifters[${i}].stolen`, 'phải là số nguyên >= 0');
+        item.stolen = d.stolen;
+      }
+      return item;
+    });
+  }
+
+  if (raw.charms !== undefined) {
+    if (!Array.isArray(raw.charms)) fail('scenario.charms', 'phải là mảng');
+    out.charms = raw.charms.map((c, i) => {
+      if (!isObject(c)) fail(`scenario.charms[${i}]`, 'phải là object');
+      checkVec3(`scenario.charms[${i}].pos`, c.pos);
+      const item = { pos: c.pos };
+      if (c.id !== undefined) {
+        if (typeof c.id !== 'string') fail(`scenario.charms[${i}].id`, 'phải là chuỗi');
+        item.id = c.id;
+      }
+      if (c.available !== undefined) {
+        if (typeof c.available !== 'boolean') fail(`scenario.charms[${i}].available`, 'phải là boolean');
+        item.available = c.available;
+      }
+      if (c.respawn_s !== undefined) {
+        checkTicks(`scenario.charms[${i}].respawn_s`, c.respawn_s);
+        item.respawn_s = c.respawn_s;
+      }
+      return item;
     });
   }
 
@@ -145,7 +222,7 @@ export function parseInputs(raw) {
       if (!isNum(f.cam_yaw_deg)) fail(`inputs.frames[${i}].cam_yaw_deg`, 'phải là số');
       frame.cam_yaw_deg = f.cam_yaw_deg;
     }
-    for (const key of ['jump', 'interact', 'pulse', 'dash']) {
+    for (const key of ['jump', 'interact', 'pulse', 'dash', 'pause']) {
       if (f[key] !== undefined) {
         if (typeof f[key] !== 'boolean') fail(`inputs.frames[${i}].${key}`, 'phải là boolean');
         frame[key] = f[key];

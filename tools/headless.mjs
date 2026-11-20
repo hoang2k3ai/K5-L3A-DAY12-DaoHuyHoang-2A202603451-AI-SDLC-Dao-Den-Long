@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Headless runner for Test Contract v1.0 (Phase 1).
+// Headless runner for Test Contract v1.1 (Phase 2).
 //
 //   node tools/headless.mjs --seed 7 --night 1 --ticks 600 \
 //     --out out.jsonl [--scenario s.json] [--inputs i.json] [--snapshot-every 10]
@@ -15,10 +15,11 @@ import {
   endLine,
   setFrames,
   drainEvents,
+  startNight,
 } from '../src/sim/world.js';
 import { parseScenario, parseInputs, ContractError } from '../src/sim/contract.js';
 
-const USAGE = `Usage: node tools/headless.mjs --seed <int> --night 1 --ticks <int> --out <file.jsonl>
+const USAGE = `Usage: node tools/headless.mjs --seed <int> --night <1|2|3> --ticks <int> --out <file.jsonl>
        [--scenario <file.json>] [--inputs <file.json>] [--snapshot-every <int>]`;
 
 function parseArgs(argv) {
@@ -83,19 +84,22 @@ function main() {
   const snapshotEvery = parseIntArg(args, 'snapshot-every', { fallback: 10 });
   const out = args.out;
   if (!out) throw new ContractError('thiếu tham số --out');
-  if (night !== 1) throw new ContractError('--night chỉ hỗ trợ giá trị 1 ở Phase 1');
+  if (![1, 2, 3].includes(night)) throw new ContractError('--night chỉ nhận giá trị 1, 2 hoặc 3');
   if (ticks < 0) throw new ContractError('--ticks phải >= 0');
   if (snapshotEvery < 1) throw new ContractError('--snapshot-every phải >= 1');
 
   const scenario = args.scenario ? parseScenario(readJsonFile(args.scenario, 'scenario')) : null;
   const frames = args.inputs ? parseInputs(readJsonFile(args.inputs, 'inputs')) : [];
 
-  const world = createWorld({ seed, scenario, tuning: TUNING });
+  const world = createWorld({ seed, night, scenario, tuning: TUNING });
   setFrames(world, frames);
 
   const lines = [JSON.stringify(snapshot(world))];
+  startNight(world);
+  for (const event of drainEvents(world)) lines.push(JSON.stringify(event));
+
   let steps = 0;
-  while (world.state === 'playing' && steps < ticks) {
+  while ((world.state === 'playing' || world.state === 'paused') && steps < ticks) {
     stepWorld(world);
     steps += 1;
     for (const event of drainEvents(world)) lines.push(JSON.stringify(event));
