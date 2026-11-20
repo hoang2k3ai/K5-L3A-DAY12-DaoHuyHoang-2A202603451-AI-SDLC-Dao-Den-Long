@@ -1,5 +1,12 @@
 # Changelog
 
+## Phase 4 — Bình minh (v1.0.0, Test Contract v1.3)
+
+- Thêm lệnh benchmark Chrome/Edge và soak một tiến trình. Giữ đầu ra headless của v1.2 cho cùng seed và input.
+- Thêm bảng xếp hạng top 10 trên đĩa, xuất JSON và seed riêng cho mỗi hành trình.
+- Thêm đổi phím và phát hiện trùng, phụ đề có mũi tên Bóng Mực, giảm chuyển động và cỡ chữ 18/22,5 px.
+- Đóng gói bản web có launcher Node.js và bổ sung video demo, bằng chứng và retro bốn phase.
+
 ## Phase 3 — Đèn cạn dầu (Test Contract v1.2)
 
 Thay đổi phá vỡ tương thích:
@@ -17,6 +24,7 @@ Giao diện thêm thanh dầu, hình đèn tắt có giấy rách, cảnh báo d
 - Thêm Lướt, Bùa Gió, Gió Lạc, bục nhảy, gió mạnh và chuỗi ba đêm với tổng điểm Bình Minh.
 - Thêm tạm dừng, cài đặt lưu cục bộ, nhạc nền và HUD theo trạng thái mô phỏng.
 - Mở rộng CLI, snapshot, scenario, test và bằng chứng headless cho cả ba đêm.
+
 ## Phase 1 — Đêm 1: Đảo Bến (tag `phase-1`)
 
 - Thêm lõi mô phỏng 60 Hz tất định: di chuyển, nhảy, nhặt đom đóm, nạp đèn, tỏa sáng, Bóng Mực đuổi, vùng an toàn quanh đèn, rơi khỏi đảo, thắng/thua, điểm.

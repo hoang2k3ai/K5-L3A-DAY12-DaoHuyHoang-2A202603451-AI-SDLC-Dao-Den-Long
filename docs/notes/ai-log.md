@@ -43,3 +43,9 @@ Bài học: chạy thật (CLI + ảnh chụp) bắt lỗi nhanh hơn đọc l�
 
 - Viết ADR về đơn vị dầu, thứ tự cập nhật và luật bình minh. Đồng bộ contract với tuning và thêm test cho hút dầu, thắp lại, vùng an toàn và kết quả tick cuối.
 - Nối thanh dầu và dấu hiệu đèn tắt vào cảnh 3D. Thêm tùy chọn bảng màu dùng chung giữa HUD và cảnh, lưu cùng cấu hình hiện có.
+
+## Phase 4
+
+- Bổ sung công cụ đo benchmark và soak, kiểm tra bảng điểm dùng chung giữa bản chơi và lệnh xuất.
+- Dùng lô hình học cho cảnh đông đối tượng và đồng bộ phần dựng GPU để đưa thời gian hoàn tất khung vào phép đo.
+- Kiểm tra đổi phím, chế độ dễ tiếp cận và lưu điểm qua lượt chơi trong Chrome. Ghi demo và đóng gói bản web để chạy trực tiếp với Node.

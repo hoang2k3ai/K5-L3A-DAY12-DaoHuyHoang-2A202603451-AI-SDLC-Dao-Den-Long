@@ -1,9 +1,8 @@
 ﻿#!/usr/bin/env node
-// Phase 3 proof suite (Test Contract v1.2).
+// Regression suite for rules inherited by Test Contract v1.3.
 //
 // Every case is executed through the real headless CLI, asserted here, and
-// stored under docs/proof/phase-3/ so the grader can reproduce it at the
-// phase-3 tag. Outputs are never edited by hand.
+// stored under tmp/phase-4-regression/ to keep the archived proofs immutable.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -14,7 +13,7 @@ import { TUNING } from '../src/sim/config.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const cli = path.join(root, 'tools', 'headless.mjs');
-const proofDir = path.join(root, 'docs', 'proof', 'phase-3');
+const proofDir = path.join(root, 'tmp', 'phase-4-regression');
 const casesDir = path.join(proofDir, 'cases');
 fs.mkdirSync(casesDir, { recursive: true });
 
@@ -760,7 +759,7 @@ const rows = results
   .sort((a, b) => a.name.localeCompare(b.name))
   .map((r) => `| ${r.ok ? 'PASS' : 'FAIL'} | ${r.name} | ${r.about} | ${r.detail} |`)
   .join('\n');
-const summary = `# Bằng chứng Phase 3 — Test Contract v1.2
+const summary = `# Kiểm tra hồi quy Phase 4 — Test Contract v1.3
 
 Sinh tự động bằng \`npm run verify\` (chạy \`tools/headless.mjs\` thật, không sửa tay output).
 Mỗi case có \`scenario.json\`, \`inputs.json\` (nếu cần) và \`output.jsonl\` trong \`cases/<tên>/\`.
@@ -768,8 +767,6 @@ Mỗi case có \`scenario.json\`, \`inputs.json\` (nếu cần) và \`output.jso
 | Kết quả | Case | Yêu cầu được chứng minh | Kết quả đo được |
 |---|---|---|---|
 ${rows}
-
-Kiểm tra giao diện và FPS được ghi trong [bằng chứng trình duyệt](browser.md).
 
 ## Cách chạy lại
 
@@ -783,5 +780,5 @@ Máy chạy: Windows 11, Node ${process.version}. Contract không phụ thuộc 
 `;
 fs.writeFileSync(path.join(proofDir, 'README.md'), summary);
 
-console.log(`\nProof written to docs/proof/phase-3/ (${results.filter((r) => r.ok).length}/${results.length} passed)`);
+console.log(`\nProof written to tmp/phase-4-regression/ (${results.filter((r) => r.ok).length}/${results.length} passed)`);
 if (failed) process.exitCode = 1;

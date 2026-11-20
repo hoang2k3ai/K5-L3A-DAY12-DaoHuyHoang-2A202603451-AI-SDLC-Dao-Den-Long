@@ -1,0 +1,12 @@
+{
+  "contract_version": "1.3",
+  "avg_fps": 149.556,
+  "p1_low_fps": 37.796,
+  "frame_ms_p95": 11.9,
+  "frames": 4487,
+  "renderer": "Three.js r187 / WebGL 2 (ANGLE (Intel, Intel(R) UHD Graphics (0x000046A3) Direct3D11 vs_5_0 ps_5_0, D3D11))",
+  "load_ms": 1820,
+  "peak_mem_mb": null,
+  "vsync_off": true,
+  "os": "win32 10.0.26200 x64"
+}

@@ -19,7 +19,7 @@ Dùng khi: sắp báo "đã xong", sắp commit/tag, hoặc sau khi sửa `src/s
    ```bash
    npm run verify
    ```
-   Bằng chứng v1.2 nằm ở `docs/proof/phase-3/cases/` và được sinh lại từ CLI thật. Mọi case phải PASS, gồm so sánh byte trên cả ba đêm và lượt 18.000 tick dưới 30 giây.
+   Bằng chứng hồi quy nằm ở `tmp/phase-4-regression/` và được sinh từ CLI thật. Mọi case phải PASS, gồm so sánh byte trên cả ba đêm và lượt 18.000 tick dưới 30 giây.
 
 3. Kiểm tra contract:
    - `game.contract.json` khớp `TUNING` (đã có test).
@@ -32,7 +32,7 @@ Dùng khi: sắp báo "đã xong", sắp commit/tag, hoặc sau khi sửa `src/s
      ```
    - Dòng đầu là snapshot tick 0, dòng cuối là `{"type":"end",...}`.
 
-4. Chạy `npm run build`. Kiểm tra thanh dầu, trạng thái hình đèn, kết quả bình minh và tùy chọn bảng màu sau khi tải lại trình duyệt. Đo FPS trung bình ở 1280×720 khi đổi cảnh 3D.
+4. Chạy `npm run build`. Đo `npm run bench -- --seed 42 --duration 30 --out bench.json` và `npm run soak -- --seed 7 --nights 10 --out soak.json`. Kiểm tra bảng điểm xuất JSON, đổi phím và lưu cài đặt trong trình duyệt.
 5. Nếu sửa hành vi: cập nhật `docs/notes/` và `CHANGELOG.md`.
 
 ## Không được làm

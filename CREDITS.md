@@ -11,7 +11,7 @@
 ## Hình ảnh, mô hình, âm thanh
 
 - **Không dùng asset bên ngoài.** Toàn bộ hình khối (đảo, đá, cỏ, đèn, nhân vật, Bóng Mực, sao, mây) được tạo bằng hình học Three.js trong `src/render/scene.js`.
-- Texture duy nhất (quầng sáng) được vẽ bằng Canvas 2D trong code.
+- Texture quầng sáng và lá bay được vẽ bằng Canvas 2D trong code.
 - Âm thanh được tổng hợp bằng WebAudio (oscillator + gain), không dùng file âm thanh hay mẫu có sẵn.
 
 ## Công cụ AI
@@ -19,9 +19,12 @@
 | Công cụ | Dùng để |
 |---|---|
 | OpenCode (agent lập trình) + model DeepSeek V4.1 Flash | Hỗ trợ viết mã, test, tài liệu; con người đặt yêu cầu, duyệt kế hoạch và kiểm chứng |
+| OpenAI Codex | Triển khai, kiểm tra hồi quy, viết tài liệu và tự động ghi hình bản chạy Phase 2–4 |
 | Không dùng công cụ sinh ảnh/âm thanh | — |
 
 Nhật ký dùng AI và ước tính token: `docs/notes/ai-log.md`.
+
+Ảnh và video demo Phase 4 ghi từ trình duyệt chạy game. Không dùng hình, giọng đọc hoặc nhạc do AI sinh.
 
 ## Nhân vật và bối cảnh
 
