@@ -1,11 +1,14 @@
 {
   "name": "dao-den-long",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "Dao Den Long - game 3D goc nhin thu ba (Day 12 AI SDLC)",
   "scripts": {
     "dev": "vite --host",
+    "start": "node tools/run.mjs",
+    "bench": "node tools/bench.mjs",
+    "soak": "node --expose-gc tools/soak.mjs",
     "build": "vite build",
     "preview": "vite preview --host",
     "headless": "node tools/headless.mjs",

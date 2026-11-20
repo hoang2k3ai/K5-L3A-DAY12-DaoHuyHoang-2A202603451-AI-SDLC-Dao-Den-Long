@@ -702,6 +702,6 @@ test('scenario validation rejects malformed data', () => {
 test('tuning in game.contract.json matches the simulation constants', async () => {
   const fs = await import('node:fs');
   const contract = JSON.parse(fs.readFileSync(new URL('../game.contract.json', import.meta.url), 'utf8'));
-  assert.equal(contract.contract_version, '1.2');
+  assert.equal(contract.contract_version, '1.3');
   assert.deepEqual(contract.tuning, JSON.parse(JSON.stringify(TUNING)));
 });

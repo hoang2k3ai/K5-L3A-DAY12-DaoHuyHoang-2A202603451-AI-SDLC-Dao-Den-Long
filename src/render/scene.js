@@ -263,7 +263,50 @@ function makeShade() {
   stunRing.visible = false;
   group.add(stunRing);
 
-  return { group, coreMaterial, eyeMaterial, outlineMaterial, stunRing, core };
+  return { group, coreMaterial, eyeMaterial, outlineMaterial, outline, stunRing, core };
+}
+
+function batchWanderingShades(scene, count) {
+  const model = makeShade();
+  const { outline, stunRing } = model;
+  const batches = model.group.children
+    .filter((child) => child !== outline && child !== stunRing)
+    .map((child) => {
+      child.updateMatrix();
+      const mesh = new THREE.InstancedMesh(child.geometry, child.material, count);
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      mesh.frustumCulled = false;
+      mesh.castShadow = child.castShadow;
+      scene.add(mesh);
+      return { mesh, local: child.matrix };
+    });
+  outline.updateMatrix();
+  const edges = outline.geometry.getAttribute('position');
+  const lines = new THREE.BufferAttribute(new Float32Array(edges.count * count * 3), 3);
+  lines.setUsage(THREE.DynamicDrawUsage);
+  const geometry = new THREE.BufferGeometry().setAttribute('position', lines);
+  const wire = new THREE.LineSegments(geometry, outline.material);
+  wire.frustumCulled = false;
+  scene.add(wire);
+  const body = new THREE.Object3D();
+  const matrix = new THREE.Matrix4();
+  const point = new THREE.Vector3();
+  return (shades, elapsed) => {
+    for (let i = 0; i < shades.length; i++) {
+      const shade = shades[i];
+      body.position.set(shade.x, shade.baseY + 1.05 + Math.sin(elapsed * 1.6 + i) * 0.1, shade.z);
+      body.rotation.y = elapsed * 0.7;
+      body.updateMatrix();
+      for (const { mesh, local } of batches) mesh.setMatrixAt(i, matrix.multiplyMatrices(body.matrix, local));
+      matrix.multiplyMatrices(body.matrix, outline.matrix);
+      for (let j = 0; j < edges.count; j++) {
+        point.fromBufferAttribute(edges, j).applyMatrix4(matrix);
+        lines.setXYZ(i * edges.count + j, point.x, point.y, point.z);
+      }
+    }
+    for (const { mesh } of batches) mesh.instanceMatrix.needsUpdate = true;
+    lines.needsUpdate = true;
+  };
 }
 
 function makeDrifter() {
@@ -368,9 +411,9 @@ function makePad(pad) {
   return group;
 }
 
-export function createStage(container) {
+export function createStage(container, { benchmark = false } = {}) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(benchmark ? 1 : Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -537,14 +580,23 @@ export function createStage(container) {
   }
 
   function scatter(rng, count, minR, maxR, make) {
+    const objects = [];
     for (let i = 0; i < count; i++) {
       const angle = rng() * Math.PI * 2;
       const radius = minR + rng() * (maxR - minR);
       const obj = make(rng);
       obj.position.set(Math.cos(angle) * radius, obj.position.y, Math.sin(angle) * radius);
       obj.rotation.y = rng() * Math.PI;
-      terrain.add(obj);
+      obj.updateMatrix();
+      objects.push(obj);
     }
+    const [sample] = objects;
+    if (!sample) return;
+    const batch = new THREE.InstancedMesh(sample.geometry, sample.material, objects.length);
+    batch.castShadow = sample.castShadow;
+    batch.receiveShadow = sample.receiveShadow;
+    objects.forEach((object, index) => batch.setMatrixAt(index, object.matrix));
+    terrain.add(batch);
   }
 
   function addDecor(radius) {
@@ -686,6 +738,7 @@ export function createStage(container) {
   const lanterns = new Map();
   const motes = new Map();
   const shades = new Map();
+  const drawCrowd = benchmark ? batchWanderingShades(scene, 200) : null;
   const drifters = new Map();
   const charms = new Map();
   const pads = [];
@@ -700,6 +753,20 @@ export function createStage(container) {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
+  const moteBatch = benchmark ? new THREE.InstancedMesh(moteGeometry, moteMaterial, 100) : null;
+  const glowBatch = benchmark ? new THREE.InstancedMesh(new THREE.PlaneGeometry(1.05, 1.05),
+    new THREE.MeshBasicMaterial({
+      map: glowTex, color: 0xffd27a, transparent: true, opacity: 0.8,
+      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    }), 100) : null;
+  const moteTransform = new THREE.Object3D();
+  if (moteBatch) {
+    for (const batch of [moteBatch, glowBatch]) {
+      batch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      batch.frustumCulled = false;
+      scene.add(batch);
+    }
+  }
 
   // A single point cloud carries the windblown leaves.
   const windCount = 260;
@@ -819,60 +886,76 @@ export function createStage(container) {
     }
 
     // motes
-    const seenMotes = new Set();
-    for (const data of world.motes) {
-      seenMotes.add(data.id);
-      let mesh = motes.get(data.id);
-      if (!mesh) {
-        const group = new THREE.Group();
-        const core = new THREE.Mesh(moteGeometry, moteMaterial);
-        const glow = new THREE.Sprite(moteGlowMaterial);
-        glow.scale.setScalar(1.05);
-        group.add(core, glow);
-        scene.add(group);
-        mesh = { group, glow, phase: Math.random() * Math.PI * 2 };
-        motes.set(data.id, mesh);
+    if (moteBatch) {
+      for (let i = 0; i < world.motes.length; i++) {
+        const mote = world.motes[i];
+        moteTransform.position.set(mote.x, mote.y + 0.72 + Math.sin(elapsed * 2.1 + i) * 0.12, mote.z);
+        moteTransform.quaternion.copy(camera.quaternion);
+        moteTransform.updateMatrix();
+        moteBatch.setMatrixAt(i, moteTransform.matrix);
+        glowBatch.setMatrixAt(i, moteTransform.matrix);
       }
-      const bob = Math.sin(elapsed * 2.1 + mesh.phase) * 0.12;
-      mesh.group.position.set(data.x, data.y + 0.72 + bob, data.z);
-      mesh.group.rotation.y += dt * 0.8;
-    }
-    for (const [id, mesh] of motes) {
-      if (seenMotes.has(id)) continue;
-      scene.remove(mesh.group);
-      motes.delete(id);
+      moteBatch.instanceMatrix.needsUpdate = true;
+      glowBatch.instanceMatrix.needsUpdate = true;
+    } else {
+      const seenMotes = new Set();
+      for (const data of world.motes) {
+        seenMotes.add(data.id);
+        let mesh = motes.get(data.id);
+        if (!mesh) {
+          const group = new THREE.Group();
+          const core = new THREE.Mesh(moteGeometry, moteMaterial);
+          const glow = new THREE.Sprite(moteGlowMaterial);
+          glow.scale.setScalar(1.05);
+          group.add(core, glow);
+          scene.add(group);
+          mesh = { group, glow, phase: Math.random() * Math.PI * 2 };
+          motes.set(data.id, mesh);
+        }
+        const bob = Math.sin(elapsed * 2.1 + mesh.phase) * 0.12;
+        mesh.group.position.set(data.x, data.y + 0.72 + bob, data.z);
+        mesh.group.rotation.y += dt * 0.8;
+      }
+      for (const [id, mesh] of motes) {
+        if (seenMotes.has(id)) continue;
+        scene.remove(mesh.group);
+        motes.delete(id);
+      }
     }
 
     // shades
-    const seenShades = new Set();
-    for (const data of world.shades) {
-      seenShades.add(data.id);
-      let mesh = shades.get(data.id);
-      if (!mesh) {
-        const built = makeShade();
-        scene.add(built.group);
-        mesh = { ...built, phase: Math.random() * Math.PI * 2 };
-        shades.set(data.id, mesh);
+    if (drawCrowd) drawCrowd(world.shades, elapsed);
+    else {
+      const seenShades = new Set();
+      for (const data of world.shades) {
+        seenShades.add(data.id);
+        let mesh = shades.get(data.id);
+        if (!mesh) {
+          const built = makeShade();
+          scene.add(built.group);
+          mesh = { ...built, phase: Math.random() * Math.PI * 2 };
+          shades.set(data.id, mesh);
+        }
+        const stunned = data.state === 'stunned';
+        const shadeColor = view.accessiblePalette ? PALETTE.shadeAccessible : VIOLET;
+        mesh.eyeMaterial.color.setHex(shadeColor);
+        mesh.outlineMaterial.color.setHex(shadeColor);
+        mesh.stunRing.material.color.setHex(shadeColor);
+        const spawning = data.state === 'spawning';
+        const opacity = spawning ? 0.45 : 1;
+        mesh.group.scale.setScalar(spawning ? 0.6 + 0.4 * (1 - data.state_ticks_left / 30) : 1);
+        mesh.group.position.set(data.x, data.baseY + 1.05 + Math.sin(elapsed * 1.6 + mesh.phase) * 0.1, data.z);
+        mesh.group.rotation.y += dt * (stunned ? 0.2 : 0.7);
+        mesh.coreMaterial.emissiveIntensity += ((stunned ? 0.15 : 0.55) - mesh.coreMaterial.emissiveIntensity) * Math.min(1, dt * 5);
+        mesh.coreMaterial.opacity += ((stunned ? 0.55 : 0.92) * opacity - mesh.coreMaterial.opacity) * Math.min(1, dt * 5);
+        mesh.stunRing.visible = stunned;
+        if (stunned) mesh.stunRing.rotation.z += dt * 3;
       }
-      const stunned = data.state === 'stunned';
-      const shadeColor = view.accessiblePalette ? PALETTE.shadeAccessible : VIOLET;
-      mesh.eyeMaterial.color.setHex(shadeColor);
-      mesh.outlineMaterial.color.setHex(shadeColor);
-      mesh.stunRing.material.color.setHex(shadeColor);
-      const spawning = data.state === 'spawning';
-      const opacity = spawning ? 0.45 : 1;
-      mesh.group.scale.setScalar(spawning ? 0.6 + 0.4 * (1 - data.state_ticks_left / 30) : 1);
-      mesh.group.position.set(data.x, data.baseY + 1.05 + Math.sin(elapsed * 1.6 + mesh.phase) * 0.1, data.z);
-      mesh.group.rotation.y += dt * (stunned ? 0.2 : 0.7);
-      mesh.coreMaterial.emissiveIntensity += ((stunned ? 0.15 : 0.55) - mesh.coreMaterial.emissiveIntensity) * Math.min(1, dt * 5);
-      mesh.coreMaterial.opacity += ((stunned ? 0.55 : 0.92) * opacity - mesh.coreMaterial.opacity) * Math.min(1, dt * 5);
-      mesh.stunRing.visible = stunned;
-      if (stunned) mesh.stunRing.rotation.z += dt * 3;
-    }
-    for (const [id, mesh] of shades) {
-      if (seenShades.has(id)) continue;
-      scene.remove(mesh.group);
-      shades.delete(id);
+      for (const [id, mesh] of shades) {
+        if (seenShades.has(id)) continue;
+        scene.remove(mesh.group);
+        shades.delete(id);
+      }
     }
 
     // drifters
@@ -960,19 +1043,25 @@ export function createStage(container) {
     }
 
     // camera
-    cameraTarget.set(p.x, p.y + 1.25, p.z);
-    const cosPitch = Math.cos(view.pitch);
-    desiredCamera.set(
-      cameraTarget.x - Math.sin(view.yaw) * view.dist * cosPitch,
-      cameraTarget.y + Math.sin(view.pitch) * view.dist,
-      cameraTarget.z - Math.cos(view.yaw) * view.dist * cosPitch,
-    );
-    desiredCamera.y = Math.max(desiredCamera.y, p.y + 1.1);
-    if (firstFrame) {
-      camera.position.copy(desiredCamera);
-      firstFrame = false;
+    if (view.orbit) {
+      camera.position.fromArray(view.orbit);
+      cameraTarget.set(0, 0, 0);
     } else {
-      camera.position.lerp(desiredCamera, 1 - Math.exp(-10 * dt));
+      cameraTarget.set(p.x, p.y + 1.25, p.z);
+      const cosPitch = Math.cos(view.pitch);
+      desiredCamera.set(
+        cameraTarget.x - Math.sin(view.yaw) * view.dist * cosPitch,
+        cameraTarget.y + Math.sin(view.pitch) * view.dist,
+        cameraTarget.z - Math.cos(view.yaw) * view.dist * cosPitch,
+      );
+      desiredCamera.y = Math.max(desiredCamera.y, p.y + 1.1);
+      if (firstFrame) {
+        camera.position.copy(desiredCamera);
+        firstFrame = false;
+      } else {
+        if (view.reducedMotion) camera.position.copy(desiredCamera);
+        else camera.position.lerp(desiredCamera, 1 - Math.exp(-10 * dt));
+      }
     }
     camera.lookAt(cameraTarget);
 
@@ -993,6 +1082,8 @@ export function createStage(container) {
 
   function render() {
     renderer.render(scene, camera);
+    // Include queued GPU work in benchmark frame timing.
+    if (benchmark) renderer.getContext().finish();
   }
 
   function resize() {

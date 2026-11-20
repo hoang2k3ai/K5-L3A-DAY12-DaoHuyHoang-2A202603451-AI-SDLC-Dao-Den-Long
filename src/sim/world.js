@@ -784,7 +784,7 @@ function moveShadeEntity(world, s, dx, dz) {
   s.baseY = h;
 }
 
-function updateShades(world, now) {
+function updateShades(world, now, wanderOnly = false) {
   for (const s of world.shades) {
     if (s.state === 'spawning') {
       if (now >= s.state_until) {
@@ -823,7 +823,7 @@ function updateShades(world, now) {
       if (s.state !== 'drain') s.target_lantern_id = null;
       continue;
     }
-    if (s.state === 'wander' && d <= WORLD.shade_detect_m) s.state = 'chase';
+    if (!wanderOnly && s.state === 'wander' && d <= WORLD.shade_detect_m) s.state = 'chase';
     else if (s.state === 'chase' && d > WORLD.shade_give_up_m) s.state = 'wander';
 
     if (s.state === 'chase') {
@@ -863,6 +863,11 @@ function updateShades(world, now) {
       );
     }
   }
+}
+
+export function stepBenchmark(world) {
+  world.tick++;
+  updateShades(world, ++world.sim_tick, true);
 }
 
 function updateDrifters(world, now) {
