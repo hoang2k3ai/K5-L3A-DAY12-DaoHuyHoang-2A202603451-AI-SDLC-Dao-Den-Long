@@ -17,3 +17,13 @@ Benchmark chạy Chrome cửa sổ, viewport 1280×720 DPR 1, GPU Intel UHD Grap
 - Dùng fixture trình duyệt để kiểm tra cùng lúc thông báo gió sắp thổi, dầu thấp và 10 giây cuối, đồng thời xác nhận Giảm chuyển động tắt chớp khi bị đánh. [Các chỉ báo](visual-warnings.png)
 - Sau lần thua thực tế, lưu tên thử và đối chiếu màn xếp hạng với JSON xuất từ kho đĩa. Fixture Bình Minh kiểm tra form lưu và tổng điểm ba đêm thắng. [Bảng xếp hạng](leaderboard.png)
 - Demo MP4/H.264 dài 50,82 giây, ghi lượt chơi thật, lưu điểm, cảnh benchmark và số đo đã chạy. [Video](../../demo/demo.mp4)
+
+## Giao diện hiện tại
+
+Ảnh chụp từ Chrome ở 1280×720 sau bản gắn tag `phase-4`.
+
+- [Menu](ui-current/menu.png) hiển thị ba đêm và lối vào Sổ phép.
+- [HUD Đêm 1](ui-current/gameplay.png) dùng kịch bản chụp để hiển thị thanh phép, cảnh báo và mũi tên hướng Bóng Mực.
+- [Đổi phím](ui-current/controls.png) hiển thị các thao tác và phím phép hiện tại.
+- [Cảnh báo Đêm 3](ui-current/visual-warnings.png) dùng kịch bản chụp với đèn sắp cạn dầu, gió sắp thổi và 9 giây trước bình minh.
+- [Bảng xếp hạng](ui-current/leaderboard.png) hiển thị một mục điểm mẫu.

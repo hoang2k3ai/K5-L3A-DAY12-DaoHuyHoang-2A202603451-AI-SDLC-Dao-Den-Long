@@ -5,6 +5,7 @@ import { createHud } from './render/hud.js';
 import { createSfx } from './render/sfx.js';
 import { DEFAULT_BINDINGS, moveFromKeys } from './input.js';
 import { readLeaderboard, saveLeaderboard } from './leaderboard-store.js';
+import { guidanceTargets } from './spell-targets.js';
 
 const stage = createStage(document.getElementById('app'));
 const hud = createHud();
@@ -19,6 +20,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const keys = new Set();
+const pendingSpells = new Set();
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
 let settings = loadSettings();
@@ -42,6 +44,7 @@ let nextMusicTick = 0;
 const nightScores = new Map();
 let resultShown = false;
 let runSeed = 0;
+let nextGuideAt = 0;
 
 const params = new URLSearchParams(window.location.search);
 const photoMode = params.has('photo');
@@ -52,7 +55,8 @@ const photoNight = clamp(Number(params.get('night') ?? 1) || 1, 1, 3);
 function loadSettings() {
   try {
     const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
-    return { ...DEFAULT_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) };
+    return { ...DEFAULT_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}),
+      bindings: { ...DEFAULT_BINDINGS, ...raw?.bindings } };
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -110,8 +114,8 @@ function photoScenario(night) {
       [base.x - 7, base.y, base.z - 6],
       [base.x + 2, base.y, base.z + 14],
     ],
-    shades: [{ pos: [base.x + 9, base.y, base.z - 6], state: 'chase' }],
-    drifters: [{ id: 'D1', pos: [base.x - 8, base.y, base.z + 4], state: 'idle' }],
+    shades: [{ pos: [base.x + 3.8, base.y, base.z + 12], state: 'chase' }],
+    drifters: night > 1 ? [{ id: 'D1', pos: [base.x - 8, base.y, base.z + 4], state: 'idle' }] : [],
     charms: map.charm_points.map((c) => ({ id: c.id, pos: [c.x, c.y, c.z] })),
     lanterns,
     time_left_s: map.duration_s - 46,
@@ -135,12 +139,17 @@ function showMenu() {
   nightScores.clear();
   runSeed = Math.floor(Math.random() * 0x100000000);
   hud.showHud(false);
-  if (!world) world = newWorld(1, 12345);
+  stage.clearSpells();
+  world = createWorld({ seed: 12, night: 1, scenario: photoScenario(1) });
   hud.showMenu({
     nights: NIGHTS,
     best,
     onSelect: () => showIntro(1),
     onSettings: () => openSettings('menu'),
+    onSpellbook: () => {
+      screen = 'spellbook';
+      hud.showSpellbook(showMenu);
+    },
     onLeaderboard: () => {
       screen = 'leaderboard';
       hud.showLeaderboard(readLeaderboard(), showMenu);
@@ -166,6 +175,9 @@ function beginNight(night) {
   windWarning = false;
   countdown = 11;
   nextMusicTick = 0;
+  nextGuideAt = 0;
+  stage.clearSpells();
+  pendingSpells.clear();
   hud.shadeSpawn(null, 0);
   keys.clear();
   hud.closeScreen();
@@ -202,6 +214,7 @@ function toggleSimPause() {
   world.prevButtons.pause = false;
   world.input.buttons.pause = false;
   keys.clear();
+  pendingSpells.clear();
   stepWorld(world, { ...inputState(), pause: true });
   for (const event of drainEvents(world)) handleEvent(event);
 }
@@ -279,21 +292,34 @@ function handleEvent(event) {
       break;
     case 'deposit':
       sfx.deposit();
+      showKindle(event.data.lantern_id);
       break;
     case 'lantern_lit':
       sfx.lantern();
       break;
     case 'refuel':
       sfx.deposit();
+      showKindle(event.data.lantern_id);
       break;
     case 'lantern_out':
       hud.toast(`${event.data.lantern_id} đã tắt. Nạp 5 đom đóm để thắp lại.`);
       break;
     case 'pulse':
       sfx.pulse();
+      stage.cast('pulse', [], settings.reducedMotion);
       break;
     case 'dash':
       sfx.dash();
+      stage.cast('dash', [], settings.reducedMotion);
+      break;
+    case 'lightning':
+      sfx.pulse();
+      stage.lightning(event.data, settings.reducedMotion);
+      hud.toast(`Thiểm Lôi · Làm choáng ${event.data.stunned_ids.length} Bóng Mực.`);
+      break;
+    case 'broom':
+      sfx.dash();
+      hud.toast('Chổi Bay · Dùng các phím di chuyển để lái.');
       break;
     case 'charm_picked':
       sfx.charm();
@@ -335,6 +361,28 @@ function handleEvent(event) {
   }
 }
 
+function showKindle(id) {
+  const lamp = world.lanterns.find((lantern) => lantern.id === id);
+  if (lamp) stage.cast('kindle', [{ ...lamp, y: lamp.y + 3.8 }], settings.reducedMotion);
+}
+
+function castGuide(action) {
+  if (world.sim_tick < nextGuideAt || world.player.falling) return;
+  const targets = guidanceTargets(world, action);
+  if (!targets.length) {
+    hud.toast(action === 'motes' ? 'Tầm Đom · Chưa có đom đóm trên đảo.' : 'Dẫn Đăng · Tất cả đèn đang sáng.');
+    return;
+  }
+  nextGuideAt = world.sim_tick + 72;
+  stage.cast(action, targets.map(({ target }) => ({
+    x: target.x, z: target.z, y: target.y + (action === 'motes' ? 0.8 : 3.8),
+  })), settings.reducedMotion);
+  const nearest = targets[0];
+  hud.toast(action === 'motes'
+    ? `Tầm Đom · Cụm gần nhất cách ${Math.round(nearest.distance)} m.`
+    : `Dẫn Đăng · ${nearest.target.id} cách ${Math.round(nearest.distance)} m.`);
+}
+
 /* -------------------------------- input ------------------------------- */
 
 function isDown(action) {
@@ -368,6 +416,12 @@ window.addEventListener('keydown', (event) => {
   if (screen === 'playing' && bound) {
     event.preventDefault();
     sfx.unlock();
+    if (!event.repeat) {
+      if (settings.bindings.motes.includes(event.code)) castGuide('motes');
+      if (settings.bindings.guide.includes(event.code)) castGuide('guide');
+      if (settings.bindings.lightning.includes(event.code)) pendingSpells.add('lightning');
+      if (settings.bindings.broom.includes(event.code)) pendingSpells.add('broom');
+    }
     keys.add(event.code);
     return;
   }
@@ -433,6 +487,9 @@ function frame(now) {
     let steps = 0;
     while (accumulator >= 1 / 60 && steps < 5) {
       const input = inputState();
+      input.lightning = pendingSpells.has('lightning');
+      input.broom = pendingSpells.has('broom');
+      pendingSpells.clear();
       const wasGrounded = world.player.grounded;
       stepWorld(world, input);
       if (input.jump && wasGrounded && world.player.vy > 0) sfx.jump();
@@ -461,6 +518,7 @@ function frame(now) {
 
   if (world) {
     stage.update(world, dt, { yaw, pitch, dist: distance,
+      orbit: screen === 'menu' && !photoMode ? [19, 12, -25] : undefined,
       accessiblePalette: settings.accessiblePalette, reducedMotion: settings.reducedMotion });
     if (screen === 'playing') hud.update(world, stage.camera);
   }

@@ -1,0 +1,79 @@
+:root {
+  --ink: #080f18;
+  --paper: #f3e7d4;
+  --warm: #eab779;
+  --warm-soft: #ffe2ad;
+  --mint: #99d8d0;
+}
+
+#overlay:has(.menu-card) {
+  place-items: center start;
+  padding: 28px clamp(24px, 6vw, 92px);
+  background: linear-gradient(90deg, #080f18f5 4%, #080f18dc 33%, #080f1854 65%, transparent);
+  backdrop-filter: none;
+}
+
+.card {
+  border: 1px solid #eab77952;
+  border-radius: 12px;
+  background: linear-gradient(140deg, #19232df5, #101720fa);
+}
+
+.menu-card {
+  width: min(550px, 100%);
+  text-align: left;
+  padding: 38px 34px 32px;
+  background: #101822dd;
+}
+
+.card h1 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.menu-card h1 {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: clamp(2.05rem, 4.25vw, 3.1rem);
+  text-shadow: none;
+  margin-block: 12px 16px;
+}
+.menu-card .actions { justify-content: flex-start; }
+.menu-card .night-list { border-top: 1px solid #eab77952; border-bottom: 1px solid #eab77952; padding-block: 12px; }
+.menu-card .night-card { padding: 6px 4px; border: 0; background: none; cursor: default; }
+.menu-card .night-card:hover { transform: none; box-shadow: none; }
+.card button, .setting { border-radius: 8px; }
+.card button.primary { background: #eab779; box-shadow: none; }
+.card button.primary:hover { background: #ffdaa0; box-shadow: none; }
+.card .meta { color: #cbc3b6; }
+.panel { border-radius: 8px; background: #101822e6; }
+.panel .label { color: #e6d5bd; }
+.hud-abilities { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 40px); }
+.hud-abilities .spell { gap: 7px; padding: 6px 8px; }
+.hud-abilities .spell .value { color: #9ad7ce; }
+.hud-abilities .spell .value.cooling { color: #e7c898; }
+.hud-abilities .spell .label { text-transform: none; letter-spacing: 0; }
+.hud-bottom { margin-bottom: 88px; }
+kbd {
+  display: inline-block;
+  border: 1px solid #d9a8727a;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font: inherit;
+  color: var(--warm-soft);
+  background: #412d25;
+}
+.spellbook { text-align: left; display: grid; grid-template-columns: max-content 1fr; gap: 10px 20px; }
+.spellbook dt { display: flex; gap: 8px; align-items: flex-start; color: var(--warm-soft); }
+.spellbook dd { margin: 0; color: #d2ddd9; }
+.spellbook-card { max-height: calc(100dvh - 40px); overflow: auto; }
+
+@media (max-width: 800px) {
+  #overlay:has(.menu-card) { place-items: center; padding: 10px; }
+  .menu-card { padding: 20px; }
+  .hud-abilities { gap: 4px; }
+  .hud-abilities .spell .value { display: none; }
+  .hud-bottom { margin-bottom: 86px; }
+  .spellbook { gap: 5px; grid-template-columns: 1fr; }
+}

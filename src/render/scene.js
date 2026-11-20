@@ -6,6 +6,8 @@
 import * as THREE from 'three';
 import { WORLD } from '../sim/config.js';
 import { lanternFuel, lanternHasSafeZone } from '../sim/world.js';
+import { makeKeeper, makeInkWraith, decorateIsland, groundTexture } from './island-art.js';
+import { createWandEffects } from './wand-effects.js';
 
 export const PALETTE = Object.freeze({
   sky: 0x070a18,
@@ -477,6 +479,7 @@ export function createStage(container, { benchmark = false } = {}) {
     new THREE.MeshBasicMaterial({ color: 0xfff1cd, fog: false }),
   );
   moon.position.set(-140, 150, -230);
+  if (!benchmark) moon.position.set(29, 28, 118);
   scene.add(moon);
   const moonGlow = new THREE.Sprite(
     new THREE.SpriteMaterial({
@@ -525,6 +528,10 @@ export function createStage(container, { benchmark = false } = {}) {
     grass: new THREE.MeshStandardMaterial({ color: PALETTE.grass, roughness: 1 }),
     path: new THREE.MeshStandardMaterial({ color: PALETTE.path, roughness: 1 }),
   };
+  if (!benchmark) {
+    const detail = groundTexture();
+    for (const surface of [materials.ground, materials.tier1, materials.tier2, materials.path]) surface.map = detail;
+  }
 
   function clearTerrain() {
     while (terrain.children.length) {
@@ -732,8 +739,9 @@ export function createStage(container, { benchmark = false } = {}) {
   }
 
   /* ---------------- dynamic objects ---------------- */
-  const player = makePlayer();
+  const player = benchmark ? makePlayer() : makeKeeper();
   scene.add(player.group);
+  const wand = benchmark ? null : createWandEffects(scene);
 
   const lanterns = new Map();
   const motes = new Map();
@@ -816,6 +824,7 @@ export function createStage(container, { benchmark = false } = {}) {
   const fogTarget = new THREE.Color();
 
   function resetDynamic() {
+    wand?.clear();
     for (const map of [lanterns, motes, shades, drifters, charms]) {
       for (const [, built] of map) {
         scene.remove(built.group ?? built);
@@ -834,6 +843,7 @@ export function createStage(container, { benchmark = false } = {}) {
     if (map.terrain.kind === 'circle') buildCircle(map);
     else if (map.terrain.kind === 'islands') buildIslands(map);
     else buildTiers(map);
+    if (!benchmark) decorateIsland(terrain, map);
     for (const pad of map.pads) {
       const mesh = makePad(pad);
       scene.add(mesh);
@@ -931,7 +941,7 @@ export function createStage(container, { benchmark = false } = {}) {
         seenShades.add(data.id);
         let mesh = shades.get(data.id);
         if (!mesh) {
-          const built = makeShade();
+          const built = makeInkWraith();
           scene.add(built.group);
           mesh = { ...built, phase: Math.random() * Math.PI * 2 };
           shades.set(data.id, mesh);
@@ -943,9 +953,11 @@ export function createStage(container, { benchmark = false } = {}) {
         mesh.stunRing.material.color.setHex(shadeColor);
         const spawning = data.state === 'spawning';
         const opacity = spawning ? 0.45 : 1;
-        mesh.group.scale.setScalar(spawning ? 0.6 + 0.4 * (1 - data.state_ticks_left / 30) : 1);
+        mesh.group.scale.setScalar(spawning ? 1 - 0.4 * Math.max(0, data.state_until - world.sim_tick) / 30 : 1);
         mesh.group.position.set(data.x, data.baseY + 1.05 + Math.sin(elapsed * 1.6 + mesh.phase) * 0.1, data.z);
-        mesh.group.rotation.y += dt * (stunned ? 0.2 : 0.7);
+        const angle = Math.atan2(world.player.x - data.x, world.player.z - data.z);
+        const difference = Math.atan2(Math.sin(angle - mesh.group.rotation.y), Math.cos(angle - mesh.group.rotation.y));
+        mesh.group.rotation.y += difference * Math.min(1, dt * 4);
         mesh.coreMaterial.emissiveIntensity += ((stunned ? 0.15 : 0.55) - mesh.coreMaterial.emissiveIntensity) * Math.min(1, dt * 5);
         mesh.coreMaterial.opacity += ((stunned ? 0.55 : 0.92) * opacity - mesh.coreMaterial.opacity) * Math.min(1, dt * 5);
         mesh.stunRing.visible = stunned;
@@ -1019,6 +1031,17 @@ export function createStage(container, { benchmark = false } = {}) {
     player.group.rotation.y = facing;
     const bob = speed > 0.4 ? Math.abs(Math.sin(elapsed * 9)) * 0.07 : Math.sin(elapsed * 2) * 0.015;
     player.bodyGroup.position.y = bob;
+    if (wand) {
+      const gesture = wand.update(world.state === 'paused' ? 0 : dt);
+      const running = !view.reducedMotion && Math.hypot(p.vx, p.vz) > 0.2 && p.grounded;
+      const stride = running ? Math.sin(elapsed * 13) * 0.52 : 0;
+      player.broom.visible = Boolean(p.broom_mounted);
+      player.legs[0].rotation.x = p.broom_mounted ? -1.15 : stride;
+      player.legs[1].rotation.x = p.broom_mounted ? -1.15 : -stride;
+      player.arm.rotation.x = -gesture * 1.35 - stride * 0.25;
+      player.tip.scale.setScalar(1 + gesture * 1.65);
+      player.scarf.rotation.x = running ? Math.sin(elapsed * 6) * 0.13 - 0.24 : 0;
+    }
     player.lantern.rotation.z = Math.sin(elapsed * 3.2) * 0.18;
     const charmActive = world.player.charm_until > world.sim_tick;
     player.light.intensity = 6 + p.carried * 0.9 + (charmActive ? 6 : 0);
@@ -1070,7 +1093,7 @@ export function createStage(container, { benchmark = false } = {}) {
     fogTarget.copy(nightColor).lerp(warmColor, ratio * 0.9);
     scene.fog.color.lerp(fogTarget, Math.min(1, dt * 1.5));
     scene.background.copy(scene.fog.color);
-    scene.fog.density = 0.008 - ratio * 0.0018;
+    scene.fog.density = (benchmark ? 0.008 : 0.0105) - ratio * 0.0018;
     ambient.intensity = 0.15 + 0.55 * ratio;
     hemi.intensity = 0.8;
     warmLight.intensity = ratio * 40;
@@ -1094,7 +1117,12 @@ export function createStage(container, { benchmark = false } = {}) {
 
   window.addEventListener('resize', resize);
 
-  return { update, render, resize, camera, setNight, domElement: renderer.domElement };
+  return {
+    update, render, resize, camera, setNight, domElement: renderer.domElement,
+    clearSpells: () => wand?.clear(),
+    cast: (type, targets, reducedMotion) => wand?.spell(type, player, targets, reducedMotion),
+    lightning: (cast, reducedMotion) => wand?.lightning(cast, player.tip, reducedMotion),
+  };
 }
 
 // Small deterministic PRNG for decorative scattering (never used by the sim).

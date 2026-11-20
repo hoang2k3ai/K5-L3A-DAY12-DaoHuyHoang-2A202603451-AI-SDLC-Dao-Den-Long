@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Đảo Đèn Lồng — Ba hòn đảo, ba đêm</title>
     <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/story-ui.css" />
   </head>
   <body>
     <div id="app"></div>
@@ -20,9 +21,14 @@
         </div>
       </div>
       <div class="hud-abilities">
-        <div class="panel"><span class="label">Lướt</span><span id="dash" class="value">sẵn sàng</span></div>
-        <div class="panel"><span class="label">Toả sáng</span><span id="pulse" class="value">sẵn sàng</span></div>
-        <div class="panel"><span class="label">Bùa Gió</span><span id="charm" class="value">—</span></div>
+        <div class="panel spell"><kbd data-bind="pulse">Q</kbd><span class="label">Tỏa Sáng</span><span id="pulse" class="value">sẵn sàng</span></div>
+        <div class="panel spell"><kbd data-bind="dash">Shift</kbd><span class="label">Lướt Gió</span><span id="dash" class="value">sẵn sàng</span></div>
+        <div class="panel spell"><kbd data-bind="interact">E</kbd><span class="label">Dẫn Lửa</span></div>
+        <div class="panel spell"><kbd data-bind="motes">F</kbd><span class="label">Tầm Đom</span></div>
+        <div class="panel spell"><kbd data-bind="guide">G</kbd><span class="label">Dẫn Đăng</span></div>
+        <div class="panel spell"><kbd data-bind="lightning">X</kbd><span class="label">Thiểm Lôi</span><span class="value" id="lightning-state">2 đom đóm</span></div>
+        <div class="panel spell"><kbd data-bind="broom">B</kbd><span class="label">Chổi Bay</span><span class="value" id="broom-state">sẵn sàng</span></div>
+        <div class="panel spell" id="charm-panel"><span class="label">Bùa Gió</span><span id="charm" class="value">—</span></div>
       </div>
       <div class="hud-middle">
         <div id="fuel-banner" class="banner warning hidden" role="status"></div>

@@ -15,6 +15,8 @@ export function moveFromKeys(forward, strafe) {
 export const ACTIONS = Object.freeze({
   up: 'Tiến', down: 'Lùi', left: 'Trái', right: 'Phải', jump: 'Nhảy',
   dash: 'Lướt', interact: 'Tương tác', pulse: 'Tỏa Sáng', pause: 'Tạm dừng',
+  motes: 'Tầm Đom', guide: 'Dẫn Đăng',
+  lightning: 'Thiểm Lôi', broom: 'Chổi Bay',
 });
 
 export const DEFAULT_BINDINGS = Object.freeze({
@@ -22,6 +24,8 @@ export const DEFAULT_BINDINGS = Object.freeze({
   left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
   jump: ['Space'], dash: ['ShiftLeft', 'ShiftRight'],
   interact: ['KeyE'], pulse: ['KeyQ'], pause: ['Escape', 'KeyP'],
+  motes: ['KeyF'], guide: ['KeyG'],
+  lightning: ['KeyX'], broom: ['KeyB'],
 });
 
 export function bindingConflict(bindings, action, code) {

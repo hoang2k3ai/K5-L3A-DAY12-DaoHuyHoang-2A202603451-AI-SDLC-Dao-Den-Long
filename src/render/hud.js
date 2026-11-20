@@ -19,7 +19,7 @@ const NIGHT_TEXT = {
     title: 'Đảo Bến',
     subtitle: 'Đêm 1 · 4 phút',
     intro:
-      'Dầu trong đèn cạn dần. Giữ ít nhất ba ngọn đèn sáng tới bình minh, Mây nhé.',
+      'Cầm lấy đũa tre này, Mây. Khi Bóng Mực tới gần, hãy Tỏa Sáng. Giữ ba ngọn đèn cháy tới bình minh.',
   },
   2: {
     title: 'Đảo Cau',
@@ -34,6 +34,16 @@ const NIGHT_TEXT = {
       'Ruộng bậc thang, tháp chuông và những cơn Gió Lạc. Bóng Mực nhanh hơn, đừng để mất hết ánh sáng.',
   },
 };
+
+const SPELLS = [
+  ['pulse', 'Tỏa Sáng', 'Tốn 3 đom đóm để làm choáng và đẩy lùi Bóng Mực trong tầm.'],
+  ['dash', 'Lướt Gió', 'Lướt nhanh theo hướng di chuyển. Bùa Gió bỏ hồi chiêu khi còn hiệu lực.'],
+  ['interact', 'Dẫn Lửa', 'Dẫn đom đóm qua đũa để thắp, châm dầu hoặc thắp lại đèn ở gần.'],
+  ['motes', 'Tầm Đom', 'Vẽ đường đến tối đa ba đom đóm gần nhất. Mây vẫn phải đến nhặt.'],
+  ['guide', 'Dẫn Đăng', 'Chỉ đường tới đèn chưa sáng gần nhất.'],
+  ['lightning', 'Thiểm Lôi', 'Tốn 2 đom đóm. Phóng sét hình quạt 60° theo hướng Mây nhìn, tầm 8 bước. Bóng Mực trúng đòn choáng 1,5 giây. Hồi 4 giây.'],
+  ['broom', 'Chổi Bay', 'Cất cánh từ mặt đất, bay cao thêm tối đa 3,5 m trong 2,5 giây và lái bằng các phím di chuyển. Hồi 8 giây.'],
+];
 
 export function createHud() {
   const el = {
@@ -52,6 +62,8 @@ export function createHud() {
     timer: document.getElementById('timer'),
     dash: document.getElementById('dash'),
     pulse: document.getElementById('pulse'),
+    lightning: document.getElementById('lightning-state'),
+    broom: document.getElementById('broom-state'),
     charm: document.getElementById('charm'),
     objective: document.getElementById('objective'),
     hint: document.getElementById('hint'),
@@ -145,10 +157,17 @@ export function createHud() {
     const pulseCd = Math.max(0, (p.pulse_ready_at - world.sim_tick) / 60);
     el.pulse.textContent = pulseCd > 0 ? `${pulseCd.toFixed(1)}s` : 'sẵn sàng';
     el.pulse.classList.toggle('cooling', pulseCd > 0);
+    const lightningCd = Math.max(0, ((p.lightning_ready_at ?? 0) - world.sim_tick) / 60);
+    el.lightning.textContent = lightningCd > 0 ? `${lightningCd.toFixed(1)}s` : '2 đom đóm';
+    el.lightning.classList.toggle('cooling', lightningCd > 0);
+    const broomCd = Math.max(0, ((p.broom_ready_at ?? 0) - world.sim_tick) / 60);
+    el.broom.textContent = p.broom_mounted ? 'đang bay' : broomCd > 0 ? `${broomCd.toFixed(1)}s` : 'sẵn sàng';
+    el.broom.classList.toggle('cooling', !p.broom_mounted && broomCd > 0);
     el.charm.textContent = charmActive
       ? `Bùa Gió ${Math.ceil((p.charm_until - world.sim_tick) / 60)}s`
       : '—';
     el.charm.classList.toggle('active', charmActive);
+    document.getElementById('charm-panel').classList.toggle('hidden', !charmActive);
 
     el.wind.classList.toggle('hidden', !world.wind.active && !world.wind.warned);
     if (world.wind.warned && !world.wind.active) el.wind.textContent = 'Sắp có gió mạnh!';
@@ -229,12 +248,12 @@ export function createHud() {
     return row;
   }
 
-  function showMenu({ nights, onSelect, onSettings, onLeaderboard, best }) {
+  function showMenu({ nights, onSelect, onSettings, onLeaderboard, onSpellbook, best }) {
     openScreen('menu-card');
-    add(`<p class="eyebrow">Đảo Đèn Lồng</p>`);
-    add(`<h1>Ba hòn đảo, ba đêm</h1>`);
+    add(`<p class="eyebrow">Hành trình của Mây</p>`);
+    add(`<h1>Đảo Đèn Lồng</h1>`);
     add(
-      `<p class="lede">Nhặt đom đóm, thắp sáng Đèn Lồng Lớn và giữ ánh sáng qua ba đêm. Mỗi đêm có bản đồ và luật chơi riêng.</p>`,
+      `<p class="lede">Mây nhận cây đũa tre từ Ông Đăng. Đi qua ba hòn đảo, xua Bóng Mực và giữ đèn sáng tới bình minh.</p>`,
     );
     const list = document.createElement('div');
     list.className = 'night-list';
@@ -247,8 +266,25 @@ export function createHud() {
     }
     el.card.appendChild(list);
     if (best > 0) add(`<p class="meta">Kỷ lục hiện tại: ${best.toLocaleString('vi-VN')} điểm</p>`);
-    el.card.appendChild(actions(button('Bắt đầu', onSelect, 'primary'),
+    el.card.appendChild(actions(button('Bắt đầu', onSelect, 'primary'), button('Sổ phép', onSpellbook),
       button('Bảng xếp hạng', onLeaderboard), button('Cài đặt', onSettings, 'ghost')));
+  }
+
+  function showSpellbook(onBack) {
+    openScreen('spellbook-card');
+    add('<h1>Sổ phép của Mây</h1>');
+    const list = document.createElement('dl');
+    list.className = 'spellbook';
+    for (const [action, name, description] of SPELLS) {
+      const title = document.createElement('dt');
+      const shortcut = document.createElement('kbd');
+      shortcut.textContent = key(action);
+      title.append(shortcut, name);
+      const detail = document.createElement('dd');
+      detail.textContent = description;
+      list.append(title, detail);
+    }
+    el.card.append(list, actions(button('Về menu', onBack, 'primary')));
   }
 
   function showIntro(night, onStart) {
@@ -494,6 +530,7 @@ export function createHud() {
     flash,
     toast,
     showMenu,
+    showSpellbook,
     showIntro,
     showPause,
     showSettings,
@@ -507,6 +544,9 @@ export function createHud() {
     },
     setBindings(newBindings) {
       bindings = newBindings;
+      for (const shortcut of document.querySelectorAll('[data-bind]')) {
+        shortcut.textContent = key(shortcut.dataset.bind);
+      }
       el.hint.textContent = `${key('up')}/${key('left')}/${key('down')}/${key('right')} di chuyển · ${key('jump')} nhảy · ${key('dash')} lướt · ${key('interact')} nạp đèn · ${key('pulse')} Tỏa Sáng · ${key('pause')} tạm dừng`;
     },
     closeScreen,

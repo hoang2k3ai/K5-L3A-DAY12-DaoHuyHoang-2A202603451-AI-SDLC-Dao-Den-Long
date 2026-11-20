@@ -8,6 +8,7 @@ import { benchmarkCamera, benchmarkWorld, frameMetrics } from '../src/bench-scen
 import { lanternFuel, stepBenchmark } from '../src/sim/world.js';
 import { bindingConflict, DEFAULT_BINDINGS } from '../src/input.js';
 import { makeEntry, rankEntries, validName } from '../src/leaderboard.js';
+import { guidanceTargets } from '../src/spell-targets.js';
 
 test('benchmark retains its seeded crowd, fuel and fixed player without gameplay side effects', () => {
   const world = benchmarkWorld(42);
@@ -80,8 +81,22 @@ test('local server and export command read the same persisted leaderboard', asyn
 });
 
 test('remapping rejects another action’s keys, including default aliases', () => {
-  assert.equal(Object.keys(DEFAULT_BINDINGS).length, 9);
+  assert.equal(Object.keys(DEFAULT_BINDINGS).length, 13);
+  assert.equal(bindingConflict(DEFAULT_BINDINGS, 'guide', 'KeyF'), 'motes');
   assert.equal(bindingConflict(DEFAULT_BINDINGS, 'pause', 'ArrowUp'), 'up');
   assert.equal(bindingConflict(DEFAULT_BINDINGS, 'jump', 'Space'), undefined);
   assert.equal(bindingConflict(DEFAULT_BINDINGS, 'jump', 'KeyJ'), undefined);
+});
+
+test('guidance reads nearest motes and unlit lanterns without changing the scene', () => {
+  const point = (id, x, lit = false) => ({ id, x, y: 0, z: 0, lit });
+  const world = {
+    player: point('Mây', 0),
+    motes: [point('A', 9), point('B', 1), point('C', 3), point('D', 2)],
+    lanterns: [point('L1', 2, true), point('L2', 6), point('L3', 3)],
+  };
+  const before = structuredClone(world);
+  assert.deepEqual(guidanceTargets(world, 'motes').map(({ target }) => target.id), ['B', 'D', 'C']);
+  assert.equal(guidanceTargets(world, 'guide')[0].target.id, 'L3');
+  assert.deepEqual(world, before);
 });

@@ -2,7 +2,9 @@
 
 Game 3D góc nhìn thứ ba bằng Three.js và Vite. Hóa thân thành Mây, gom đom đóm và thắp lại Đèn Lồng Lớn qua ba đêm ở Đảo Bến, Đảo Cau và Đảo Chuông.
 
-![HUD với cảnh báo và mũi tên hướng Bóng Mực](docs/proof/phase-4/gameplay.png)
+![Giao diện hiện tại của Đảo Đèn Lồng](docs/proof/phase-4/ui-current/menu.png)
+
+[Ảnh HUD, điều khiển, cảnh báo và bảng xếp hạng](docs/proof/phase-4/README.md#giao-diện-hiện-tại)
 
 [Video demo MP4](docs/demo/demo.mp4) · [Bản web v1.0.0](docs/release/dao-den-long-v1.0.0-web.zip)
 
@@ -25,6 +27,9 @@ Mở http://127.0.0.1:4173 nếu trình duyệt chưa tự mở. Bản ZIP đã 
 | Shift | Lướt |
 | E | Nạp đom đóm vào đèn gần nhất |
 | Q | Tỏa Sáng |
+| F / G | Tầm Đom / Dẫn Đăng |
+| X | Thiểm Lôi, sét hình quạt 60° tầm 8 bước |
+| B | Chổi Bay, cất cánh rồi lái bằng phím di chuyển |
 | Kéo / lăn chuột | Xoay / thu phóng camera |
 | Esc / P | Tạm dừng |
 | R / M | Chơi lại / tắt tiếng |
@@ -33,7 +38,9 @@ Mây phải sống tới bình minh và giữ ít nhất **3/5, 4/6, 5/7 đèn s
 
 Dưới 30 dầu, đèn nhấp nháy, mất vùng an toàn và có thể bị Bóng Mực hút dầu. Tỏa Sáng tốn 3 đom đóm. Gió Lạc cướp đom đóm, còn Bùa Gió tăng tốc chạy và bỏ hồi chiêu Lướt trong 10 giây. Chế độ **Bảng màu dễ phân biệt** nằm trong Cài đặt.
 
-Cài đặt hỗ trợ đổi phím cho chín hành động, giảm chuyển động và phông chữ 18 px hoặc 22,5 px. Sau khi thua hoặc thắng cả hành trình, nhập tên 3–12 ký tự chữ Latin, số hoặc dấu gạch dưới để lưu tổng điểm các đêm thắng. Bản chạy từ `npm start` ghi top 10 trong `~/.dao-den-long/leaderboard.json`. Mỗi hành trình có một seed; chơi lại cùng đêm giữ seed. Chế độ dev dùng kho riêng trong trình duyệt.
+Mở **Sổ phép** ở menu để xem các phép. Tầm Đom chỉ tới tối đa ba đom đóm gần nhất. Dẫn Đăng chỉ tới đèn chưa sáng gần nhất. Thiểm Lôi tốn 2 đom đóm, làm choáng Bóng Mực ở gần cùng độ cao và hồi sau 4 giây. Chổi Bay giữ Mây trên không 2,5 giây trước khi hạ xuống, hồi sau 8 giây. Cài đặt hỗ trợ đổi phím, giảm chuyển động và phông chữ 18 px hoặc 22,5 px.
+
+Sau khi thua hoặc thắng cả hành trình, nhập tên 3–12 ký tự chữ Latin, số hoặc dấu gạch dưới để lưu tổng điểm các đêm thắng. Bản chạy từ `npm start` ghi top 10 trong `~/.dao-den-long/leaderboard.json`. Mỗi hành trình có một seed; chơi lại cùng đêm giữ seed. Chế độ dev dùng kho riêng trong trình duyệt.
 
 ```bash
 node tools/run.mjs --export-leaderboard out.json

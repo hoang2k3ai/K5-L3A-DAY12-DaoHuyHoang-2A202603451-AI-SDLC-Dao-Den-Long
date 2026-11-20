@@ -29,3 +29,6 @@ Nhật ký dùng AI và ước tính token: `docs/notes/ai-log.md`.
 ## Nhân vật và bối cảnh
 
 Mây, Đảo Đèn Lồng, Bóng Mực, Đèn Lồng Lớn là nội dung gốc của lab Day 12. Không dùng nhân vật, thương hiệu hay tài sản của game/phim khác.
+
+- Mái ngói, đèn giấy và sắc hổ phách tham khảo không khí lễ hội đèn lồng Hội An. [Vietnam Tourism](https://vietnam.travel/things-to-do/the-best-ways-to-explore-the-ancient-town-of-hoi-an/)
+- Nhịp đối lập giữa bóng ma lướt và phép ánh sáng phòng vệ tham khảo phần Ngục nhân Azkaban. Mây, mặt nạ Bóng Mực và bộ phép dùng hình học, tên và hiệu ứng tự tạo. [Dementor](https://www.harrypotter.com/fact-file/creatures/dementor) · [Patronus](https://www.harrypotter.com/features/what-is-a-patronus)

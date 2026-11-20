@@ -5,6 +5,7 @@
 // Test Contract evidence trustworthy.
 import { TUNING, WORLD } from './config.js';
 import { makeRng } from './rng.js';
+import { BROOM, LIGHTNING, lightningHits } from './extra-spells.js';
 import { ContractError } from './contract.js';
 import {
   getMap,
@@ -417,7 +418,7 @@ function movePlayer(world, now, edges) {
   }
 
   const charmActive = now < p.charm_until;
-  if (edges.dash && now >= p.dash_until) {
+  if (edges.dash && !p.broom_mounted && now >= p.dash_until) {
     const ready = charmActive || now >= p.dash_ready_at;
     if (ready) startDash(world, now);
   }
@@ -464,12 +465,17 @@ function movePlayer(world, now, edges) {
     p.grounded = true;
   }
 
-  if (edges.jump && p.grounded && !dashing) {
+  const flying = now < (p.broom_until ?? 0);
+  if (edges.jump && p.grounded && !dashing && !flying) {
     p.vy = WORLD.jump_speed;
     p.grounded = false;
   }
 
-  if (dashing) {
+  if (flying) {
+    p.vy = Math.min(BROOM.riseSpeed, Math.max(0, (p.broom_ceiling - p.y) / DT));
+    p.y += p.vy * DT;
+    p.grounded = false;
+  } else if (dashing) {
     p.vy = 0;
   } else {
     p.vy -= WORLD.gravity * DT;
@@ -479,11 +485,12 @@ function movePlayer(world, now, edges) {
   support = supportHeightAt(world.map, p.x, p.z, p.y);
   if (support === null) {
     p.grounded = false;
-  } else if (p.y <= support && p.vy <= 0) {
+  } else if (!flying && p.y <= support && p.vy <= 0) {
     p.y = support;
     p.vy = 0;
     p.grounded = true;
     p.launched = false;
+    p.broom_mounted = false;
   } else {
     p.grounded = false;
   }
@@ -498,6 +505,33 @@ function canStand(world, x, z, y) {
   if (blockedByObstacle(world.map, x, z, y)) return false;
   if (!world.tuning.fall_enabled && supportHeightAt(world.map, x, z, y) === null) return false;
   return true;
+}
+
+function mountBroom(world, now) {
+  const p = world.player;
+  if (!p.grounded || p.falling || now < p.dash_until || now < (p.broom_ready_at ?? 0)) return;
+  p.broom_mounted = true;
+  p.broom_until = now + BROOM.duration;
+  p.broom_ready_at = now + BROOM.cooldown;
+  p.broom_ceiling = p.y + BROOM.height;
+  emit(world, 'broom', {});
+}
+
+function castLightning(world, now) {
+  const p = world.player;
+  if (p.falling || p.carried < LIGHTNING.cost || now < (p.lightning_ready_at ?? 0)) return;
+  p.carried -= LIGHTNING.cost;
+  p.lightning_ready_at = now + LIGHTNING.cooldown;
+  const stunned_ids = [];
+  for (const shade of world.shades) {
+    if (!lightningHits(p, shade)) continue;
+    shade.state = 'stunned';
+    shade.target_lantern_id = null;
+    shade.state_until = Math.max(shade.state_until, now + LIGHTNING.stun);
+    shade.stun_push_left = 0;
+    stunned_ids.push(shade.id);
+  }
+  emit(world, 'lightning', { x: p.x, y: p.y, z: p.z, facing: p.facing, stunned_ids });
 }
 
 function startDash(world, now) {
@@ -540,6 +574,8 @@ function triggerFall(world, now) {
   const p = world.player;
   if (p.falling) return;
   p.flames -= 1;
+  p.broom_mounted = false;
+  p.broom_until = 0;
   const lost = p.carried;
   p.carried = 0;
   emit(world, 'player_hit', { by: 'fall', flames: p.flames, dropped: 0, lost });
@@ -1154,6 +1190,7 @@ export function stepWorld(world, liveInput = null) {
   expireTimers(world, now);
   spendFuel(world);
 
+  if (liveInput?.broom && world.player.flames > 0) mountBroom(world, now);
   movePlayer(world, now, edges);
   if (world.player.flames > 0) {
     pickUp(world, now);
@@ -1161,6 +1198,7 @@ export function stepWorld(world, liveInput = null) {
   }
   updateSafeZones(world, now);
   if (world.player.flames > 0) doPulse(world, now, edges);
+  if (liveInput?.lightning && world.player.flames > 0) castLightning(world, now);
   updateShades(world, now);
   updateSafeZones(world, now); // enforce the boundary after every shade move
   updateDrifters(world, now);
