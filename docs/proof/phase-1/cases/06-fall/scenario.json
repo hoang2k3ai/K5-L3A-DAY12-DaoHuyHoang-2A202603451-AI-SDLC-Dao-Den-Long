@@ -1,0 +1,12 @@
+{
+  "player": {
+    "pos": [
+      40,
+      0,
+      0
+    ]
+  },
+  "random_motes": false,
+  "random_shades": false,
+  "motes": []
+}

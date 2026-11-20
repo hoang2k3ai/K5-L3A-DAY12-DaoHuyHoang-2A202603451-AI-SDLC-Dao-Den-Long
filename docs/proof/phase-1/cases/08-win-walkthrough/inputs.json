@@ -1,0 +1,99 @@
+{
+  "frames": [
+    {
+      "tick": 0,
+      "move": [
+        0,
+        -1
+      ]
+    },
+    {
+      "tick": 180,
+      "move": [
+        0,
+        0
+      ],
+      "interact": true
+    },
+    {
+      "tick": 181,
+      "interact": false
+    },
+    {
+      "tick": 182,
+      "move": [
+        0.8494,
+        0.5278
+      ]
+    },
+    {
+      "tick": 386,
+      "move": [
+        0,
+        0
+      ],
+      "interact": true
+    },
+    {
+      "tick": 387,
+      "interact": false
+    },
+    {
+      "tick": 388,
+      "move": [
+        -0.2313,
+        0.9729
+      ]
+    },
+    {
+      "tick": 609,
+      "move": [
+        0,
+        0
+      ],
+      "interact": true
+    },
+    {
+      "tick": 610,
+      "interact": false
+    },
+    {
+      "tick": 611,
+      "move": [
+        -0.9967,
+        0.0809
+      ]
+    },
+    {
+      "tick": 832,
+      "move": [
+        0,
+        0
+      ],
+      "interact": true
+    },
+    {
+      "tick": 833,
+      "interact": false
+    },
+    {
+      "tick": 834,
+      "move": [
+        -0.3849,
+        -0.9229
+      ]
+    },
+    {
+      "tick": 1055,
+      "move": [
+        0,
+        0
+      ],
+      "interact": true
+    },
+    {
+      "tick": 1056,
+      "interact": false
+    }
+  ]
+}

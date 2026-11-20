@@ -1,0 +1,28 @@
+# Ghi nguồn (CREDITS)
+
+## Mã nguồn và thư viện
+
+| Thành phần | Giấy phép | Nguồn |
+|---|---|---|
+| Three.js | MIT | https://threejs.org |
+| Vite | MIT | https://vite.dev |
+| Phần còn lại của game | MIT (xem `LICENSE`) | Tự viết trong repo này |
+
+## Hình ảnh, mô hình, âm thanh
+
+- **Không dùng asset bên ngoài.** Toàn bộ hình khối (đảo, đá, cỏ, đèn, nhân vật, Bóng Mực, sao, mây) được tạo bằng hình học Three.js trong `src/render/scene.js`.
+- Texture duy nhất (quầng sáng) được vẽ bằng Canvas 2D trong code.
+- Âm thanh được tổng hợp bằng WebAudio (oscillator + gain), không dùng file âm thanh hay mẫu có sẵn.
+
+## Công cụ AI
+
+| Công cụ | Dùng để |
+|---|---|
+| OpenCode (agent lập trình) + model DeepSeek V4.1 Flash | Hỗ trợ viết mã, test, tài liệu; con người đặt yêu cầu, duyệt kế hoạch và kiểm chứng |
+| Không dùng công cụ sinh ảnh/âm thanh | — |
+
+Nhật ký dùng AI và ước tính token: `docs/notes/ai-log.md`.
+
+## Nhân vật và bối cảnh
+
+Mây, Đảo Đèn Lồng, Bóng Mực, Đèn Lồng Lớn là nội dung gốc của lab Day 12. Không dùng nhân vật, thương hiệu hay tài sản của game/phim khác.

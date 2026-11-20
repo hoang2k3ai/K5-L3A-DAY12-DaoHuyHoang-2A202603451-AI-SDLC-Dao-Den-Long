@@ -1,0 +1,21 @@
+{
+  "random_motes": true,
+  "random_shades": true,
+  "motes": [
+    [
+      2,
+      0,
+      3
+    ]
+  ],
+  "shades": [
+    {
+      "pos": [
+        12,
+        0,
+        -4
+      ]
+    }
+  ],
+  "time_left_s": 120
+}

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Runs the test suite before every commit. Enable with: npm install (prepare script)
+# or manually: git config core.hooksPath .githooks
+set -e
+npm test
