@@ -1,5 +1,11 @@
 # Changelog
 
+## Phase 2 — Ba đêm (Test Contract v1.1)
+
+- Chuẩn hóa tuning và mở rộng bản đồ từ Đảo Bến sang Đảo Cau và Đảo Chuông.
+- Thêm Lướt, Bùa Gió, Gió Lạc, bục nhảy, gió mạnh và chuỗi ba đêm với tổng điểm Bình Minh.
+- Thêm tạm dừng, cài đặt lưu cục bộ, nhạc nền và HUD theo trạng thái mô phỏng.
+- Mở rộng CLI, snapshot, scenario, test và bằng chứng headless cho cả ba đêm.
 ## Phase 1 — Đêm 1: Đảo Bến (tag `phase-1`)
 
 - Thêm lõi mô phỏng 60 Hz tất định: di chuyển, nhảy, nhặt đom đóm, nạp đèn, tỏa sáng, Bóng Mực đuổi, vùng an toàn quanh đèn, rơi khỏi đảo, thắng/thua, điểm.

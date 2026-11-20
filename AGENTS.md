@@ -5,7 +5,7 @@ Hướng dẫn cố định cho agent. Ngắn, chỉ những gì lặp lại m�
 ## Dự án
 
 - Game 3D web: Three.js + Vite. Lõi mô phỏng là JavaScript thuần, chạy được bằng Node.
-- Hợp đồng bắt buộc: `game.contract.json` + `docs/notes/phase-1-assumptions.md`.
+- Hợp đồng hiện tại: `game.contract.json` v1.1 + `docs/notes/phase-2-spec.md`. Giả định Phase 1 nằm trong `docs/notes/phase-1-assumptions.md`.
 - Yêu cầu gốc của phase nằm trên lab board, không nằm trong repo.
 
 ## Lệnh
@@ -13,7 +13,7 @@ Hướng dẫn cố định cho agent. Ngắn, chỉ những gì lặp lại m�
 ```bash
 npm install                 # cài dependency
 npm test                    # unit + CLI test (node:test)
-npm run verify              # sinh lại bằng chứng docs/proof/phase-1/
+npm run verify              # sinh lại bằng chứng docs/proof/phase-2/
 npm run dev                 # chơi thử ở http://localhost:5173
 npm run build               # kiểm tra bundle
 node tools/headless.mjs --seed 1 --night 1 --ticks 600 --out out.jsonl
@@ -23,6 +23,8 @@ node tools/headless.mjs --seed 1 --night 1 --ticks 600 --out out.jsonl
 
 - Mô phỏng cố định **60 tick/giây**; `--ticks N` chạy đúng N bước.
 - Snapshot tick 0 là trạng thái **trước** khi áp input; bước k đọc input tick k và tạo trạng thái k+1; sự kiện ghi `tick = k+1`.
+- `--night` nhận 1–3. Khi tạm dừng, `tick` vẫn tăng còn `sim_tick` đứng yên. Dash và pause kích hoạt khi nhấn mới.
+- Bản đồ chuẩn nằm ở `src/sim/maps.js`. Sau thay đổi, kiểm tra một lượt mặc định cho mỗi đêm và lượt có scenario. Đo FPS bản thường ở 1280×720.
 - Toạ độ làm tròn 3 chữ số thập phân. `time_left_s = thời lượng − tick/60`.
 - `src/sim/` **không** được import `three`, DOM hay bất cứ thứ gì cần GPU.
 - Mọi ngẫu nhiên đi qua `world.rng` (mulberry32). Không dùng `Math.random()` trong `src/sim/`.

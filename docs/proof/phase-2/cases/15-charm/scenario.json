@@ -1,0 +1,15 @@
+{
+  "random_motes": false,
+  "random_shades": false,
+  "motes": [],
+  "charms": [
+    {
+      "id": "C1",
+      "pos": [
+        1,
+        0,
+        0
+      ]
+    }
+  ]
+}

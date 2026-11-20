@@ -1,3 +1,4 @@
+---
 name: verify-game
 description: Chạy kiểm chứng Đảo Đèn Lồng (test + bằng chứng headless) trước khi báo xong hoặc trước khi commit/tag.
 ---
@@ -18,20 +19,21 @@ Dùng khi: sắp báo "đã xong", sắp commit/tag, hoặc sau khi sửa `src/s
    ```bash
    npm run verify
    ```
-   Phải `9/9 passed`. Bằng chứng nằm ở `docs/proof/phase-1/cases/*/output.jsonl` và được sinh lại từ CLI thật.
+   Bằng chứng v1.1 nằm ở `docs/proof/phase-2/cases/` và được sinh lại từ CLI thật. Mọi case phải PASS, gồm so sánh byte trên cả ba đêm và lượt 21.600 tick dưới 30 giây.
 
 3. Kiểm tra contract:
    - `game.contract.json` khớp `TUNING` (đã có test).
-   - Chạy tay một lần không scenario và một lần có scenario:
+   - Chạy mặc định ở cả ba đêm và chạy thêm một lượt có scenario:
      ```bash
-     node tools/headless.mjs --seed 1 --night 1 --ticks 300 --out tmp/a.jsonl
-     node tools/headless.mjs --seed 1 --night 1 --ticks 300 \
-       --scenario docs/proof/phase-1/cases/01-pickup/scenario.json \
-       --inputs docs/proof/phase-1/cases/01-pickup/inputs.json --out tmp/b.jsonl
+     node tools/headless.mjs --seed 1 --night 1 --ticks 1200 --out tmp/night1.jsonl
+     node tools/headless.mjs --seed 1 --night 2 --ticks 1200 --out tmp/night2.jsonl
+     node tools/headless.mjs --seed 1 --night 3 --ticks 1200 --out tmp/night3.jsonl
+     node tools/headless.mjs --seed 1 --night 2 --ticks 12 --scenario docs/proof/phase-2/cases/21-pause/scenario.json --inputs docs/proof/phase-2/cases/21-pause/inputs.json --out tmp/pause.jsonl
      ```
    - Dòng đầu là snapshot tick 0, dòng cuối là `{"type":"end",...}`.
 
-4. Nếu sửa hành vi: cập nhật `docs/notes/` (giả định, nhật ký AI, retro) và `CHANGELOG.md`.
+4. Chạy `npm run build`. Kiểm tra luồng ba đêm, tạm dừng, cài đặt, HUD và âm thanh trong trình duyệt, đo FPS trung bình ở 1280×720.
+5. Nếu sửa hành vi: cập nhật `docs/notes/` và `CHANGELOG.md`.
 
 ## Không được làm
 

@@ -32,3 +32,9 @@ Cách tiết kiệm đã dùng:
 | 4 | Case proof `06-fall` đọc snapshot cuối nhưng `--snapshot-every` mặc định 10 nên chỉ có snapshot tick 0 | `npm run verify` báo FAIL "respawn at origin" | Cho case chạy đủ 10 tick để có snapshot sau khi hồi sinh |
 
 Bài học: chạy thật (CLI + ảnh chụp) bắt lỗi nhanh hơn đọc lại code; test phải viết theo bất biến, không theo giá trị tình cờ.
+
+## Phase 2
+
+- Đối chiếu phần triển khai đang có với ticket, ghi tiêu chí nghiệm thu và các bảng dữ liệu còn thiếu.
+- Hoàn thiện luồng chiến dịch, tổng điểm, HUD, cảnh báo gió và âm thanh. Cập nhật hướng dẫn tái tạo bằng chứng v1.1.
+- Kiểm tra hồi chiêu, thứ tự va chạm và lịch sinh bằng CLI. Kiểm tra tạm dừng, dữ liệu cài đặt, chuyển đêm và tổng điểm bằng Chrome, lưu ảnh và số đo FPS.
