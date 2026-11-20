@@ -1,0 +1,22 @@
+{
+  "name": "dao-den-long",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Dao Den Long - game 3D goc nhin thu ba (Day 12 AI SDLC)",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "headless": "node tools/headless.mjs",
+    "test": "node --test",
+    "verify": "node tools/verify.mjs",
+    "prepare": "node tools/setup-hooks.mjs"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
+  }
+}
