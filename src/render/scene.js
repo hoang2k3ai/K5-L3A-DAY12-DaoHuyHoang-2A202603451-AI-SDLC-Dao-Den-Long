@@ -1,8 +1,48 @@
+﻿// Three.js presentation layer for "Đảo Đèn Lồng".
+//
+// Rendering only: every rule that affects the outcome lives in src/sim/.
+// The palette is fixed by the Phase 2 art direction (each channel of a rendered
+// surface must stay within 10% of these base values).
 import * as THREE from 'three';
 import { WORLD } from '../sim/config.js';
 
-const WARM = 0xffb45e;
-const VIOLET = 0xb98cff;
+export const PALETTE = Object.freeze({
+  sky: 0x070a18,
+  fog: 0x0d1226,
+  sea: 0x111a30,
+  ground: 0x40567c,
+  groundSide: 0x2b3c5e,
+  tier1: 0x384b6d,
+  tier2: 0x44597e,
+  bridge: 0x4a3b2e,
+  ramp: 0x3d4f70,
+  rock: 0x1d2740,
+  grass: 0x35635e,
+  path: 0x3d4c63,
+  lanternWarm: 0xffb45e,
+  lanternBody: 0xffd9a0,
+  mote: 0xffe9ad,
+  shadeCore: 0x1b1026,
+  shadeGlow: 0xb98cff,
+  drifter: 0x8fd3ff,
+  charm: 0xffd166,
+  wind: 0xa8c8ff,
+  tower: 0x2b2233,
+  moon: 0xfff1cd,
+});
+
+const WARM = PALETTE.lanternWarm;
+const WARM_FOG = new THREE.Color(0x2a1d2e);
+const VIOLET = PALETTE.shadeGlow;
+
+/** Deterministic pseudo-random for decorative scatter (never used by the sim). */
+function scatter(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
 
 function glowTexture() {
   const size = 128;
@@ -22,6 +62,8 @@ function glowTexture() {
   return texture;
 }
 
+const glowTex = typeof document === 'undefined' ? null : glowTexture();
+
 function makeLantern() {
   const group = new THREE.Group();
   const pole = new THREE.Mesh(
@@ -40,7 +82,7 @@ function makeLantern() {
   group.add(base);
 
   const bodyMaterial = new THREE.MeshStandardMaterial({
-    color: 0xffd9a0,
+    color: PALETTE.lanternBody,
     emissive: 0xff9a3c,
     emissiveIntensity: 0.04,
     roughness: 0.5,
@@ -60,13 +102,13 @@ function makeLantern() {
   roof.rotation.y = Math.PI / 4;
   group.add(roof);
 
-  const light = new THREE.PointLight(WARM, 0, 26, 2);
+  const light = new THREE.PointLight(WARM, 0, 30, 2);
   light.position.y = 3.9;
   group.add(light);
 
   const glow = new THREE.Sprite(
     new THREE.SpriteMaterial({
-      map: glowTexture(),
+      map: glowTex,
       color: WARM,
       transparent: true,
       opacity: 0.2,
@@ -78,12 +120,13 @@ function makeLantern() {
   glow.scale.setScalar(1.2);
   group.add(glow);
 
+  // Safe radius ring: matches TUNING.safe_radius (6 m).
   const safeRing = new THREE.Mesh(
-    new THREE.RingGeometry(3.92, 4.02, 56),
+    new THREE.RingGeometry(5.9, 6.02, 64),
     new THREE.MeshBasicMaterial({ color: WARM, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }),
   );
   safeRing.rotation.x = -Math.PI / 2;
-  safeRing.position.y = 0.03;
+  safeRing.position.y = 0.04;
   group.add(safeRing);
 
   return { group, bodyMaterial, light, glow, safeRing };
@@ -111,7 +154,7 @@ function makePlayer() {
   bodyGroup.add(head);
 
   const hat = new THREE.Mesh(
-    new THREE.ConeGeometry(0.62, 0.4, 22, 1, true),
+    new THREE.ConeGeometry(0.5, 0.34, 22, 1, true),
     new THREE.MeshStandardMaterial({ color: 0xe9d9ad, roughness: 0.95, side: THREE.DoubleSide }),
   );
   hat.position.y = 1.6;
@@ -127,7 +170,7 @@ function makePlayer() {
   lantern.add(bulb);
   const halo = new THREE.Sprite(
     new THREE.SpriteMaterial({
-      map: glowTexture(),
+      map: glowTex,
       color: WARM,
       transparent: true,
       opacity: 0.55,
@@ -149,7 +192,7 @@ function makePlayer() {
 function makeShade() {
   const group = new THREE.Group();
   const coreMaterial = new THREE.MeshStandardMaterial({
-    color: 0x1b1026,
+    color: PALETTE.shadeCore,
     emissive: 0x2c0f42,
     emissiveIntensity: 0.5,
     roughness: 0.55,
@@ -186,140 +229,178 @@ function makeShade() {
   return { group, coreMaterial, stunRing, core };
 }
 
+function makeDrifter() {
+  const group = new THREE.Group();
+  const material = new THREE.MeshStandardMaterial({
+    color: PALETTE.drifter,
+    emissive: PALETTE.drifter,
+    emissiveIntensity: 0.35,
+    transparent: true,
+    opacity: 0.75,
+    roughness: 0.6,
+  });
+  const body = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.8, 7), material);
+  body.rotation.x = Math.PI / 2;
+  group.add(body);
+
+  const wings = [];
+  for (const side of [-1, 1]) {
+    const wing = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.3), material);
+    wing.position.set(side * 0.45, 0.05, 0);
+    wing.rotation.z = side * 0.35;
+    group.add(wing);
+    wings.push(wing);
+  }
+
+  const glow = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: glowTex,
+      color: PALETTE.drifter,
+      transparent: true,
+      opacity: 0.35,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  glow.scale.setScalar(1.6);
+  group.add(glow);
+
+  return { group, wings, material };
+}
+
+function makeCharm() {
+  const group = new THREE.Group();
+  const material = new THREE.MeshStandardMaterial({
+    color: PALETTE.charm,
+    emissive: 0xffa53c,
+    emissiveIntensity: 1.2,
+    roughness: 0.35,
+  });
+  const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), material);
+  group.add(core);
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.55, 0.02, 8, 40),
+    new THREE.MeshBasicMaterial({ color: PALETTE.charm, transparent: true, opacity: 0.6, depthWrite: false }),
+  );
+  ring.rotation.x = Math.PI / 2;
+  group.add(ring);
+
+  const glow = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: glowTex,
+      color: PALETTE.charm,
+      transparent: true,
+      opacity: 0.5,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  glow.scale.setScalar(2.2);
+  group.add(glow);
+
+  return { group, core, ring };
+}
+
+function makePad(pad) {
+  const group = new THREE.Group();
+  group.position.set(pad.x, pad.y + 0.05, pad.z);
+
+  const disc = new THREE.Mesh(
+    new THREE.CylinderGeometry(pad.r, pad.r, 0.16, 24),
+    new THREE.MeshStandardMaterial({ color: 0x2c3c5c, emissive: 0x2b6cff, emissiveIntensity: 0.35, roughness: 0.6 }),
+  );
+  group.add(disc);
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(pad.r * 0.82, 0.06, 8, 36),
+    new THREE.MeshBasicMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.85 }),
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.1;
+  group.add(ring);
+
+  const arrow = new THREE.Mesh(
+    new THREE.ConeGeometry(0.3, 0.7, 4),
+    new THREE.MeshBasicMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.8 }),
+  );
+  arrow.position.y = 0.75;
+  arrow.rotation.x = Math.PI;
+  group.add(arrow);
+
+  return group;
+}
+
 export function createStage(container) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
+  renderer.toneMappingExposure = 1.55;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const nightColor = new THREE.Color(0x080a17);
-  const warmColor = new THREE.Color(0x2a1d2e);
+  const nightColor = new THREE.Color(PALETTE.sky);
   scene.background = nightColor.clone();
-  scene.fog = new THREE.FogExp2(nightColor.clone(), 0.014);
+  scene.fog = new THREE.FogExp2(PALETTE.fog, 0.008);
 
-  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 500);
-  camera.position.set(0, 8, -11);
+  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 700);
+  camera.position.set(0, 10, -14);
 
-  const hemi = new THREE.HemisphereLight(0x6a7fc0, 0x1a1424, 0.85);
+  const ambient = new THREE.AmbientLight(0x40507a, 0.55);
+  scene.add(ambient);
+
+  const hemi = new THREE.HemisphereLight(0x7a90d0, 0x1a1424, 1.25);
   scene.add(hemi);
 
-  const moonLight = new THREE.DirectionalLight(0xa9c0ff, 0.85);
-  moonLight.position.set(28, 42, 18);
+  const moonLight = new THREE.DirectionalLight(0xb4c8ff, 1.2);
+  moonLight.position.set(40, 60, 24);
   moonLight.castShadow = true;
   moonLight.shadow.mapSize.set(2048, 2048);
-  moonLight.shadow.camera.left = -36;
-  moonLight.shadow.camera.right = 36;
-  moonLight.shadow.camera.top = 36;
-  moonLight.shadow.camera.bottom = -36;
+  moonLight.shadow.camera.left = -60;
+  moonLight.shadow.camera.right = 60;
+  moonLight.shadow.camera.top = 60;
+  moonLight.shadow.camera.bottom = -60;
   moonLight.shadow.camera.near = 1;
-  moonLight.shadow.camera.far = 140;
+  moonLight.shadow.camera.far = 220;
   moonLight.shadow.bias = -0.0008;
   scene.add(moonLight);
   scene.add(moonLight.target);
 
-  const warmLight = new THREE.PointLight(0xff9a4a, 0, 90, 2);
-  warmLight.position.set(0, 16, 0);
+  const warmLight = new THREE.PointLight(0xff9a4a, 0, 120, 2);
+  warmLight.position.set(0, 20, 0);
   scene.add(warmLight);
 
-  // --- island -------------------------------------------------------
-  const island = new THREE.Mesh(
-    new THREE.CylinderGeometry(WORLD.island_radius, WORLD.island_radius + 1.6, 3.2, 72),
-    new THREE.MeshStandardMaterial({ color: 0x36486a, roughness: 1 }),
-  );
-  island.position.y = -1.6;
-  island.receiveShadow = true;
-  scene.add(island);
-
-  const meadow = new THREE.Mesh(
-    new THREE.CircleGeometry(WORLD.island_radius, 72),
-    new THREE.MeshStandardMaterial({ color: 0x3d5170, roughness: 1 }),
-  );
-  meadow.rotation.x = -Math.PI / 2;
-  meadow.position.y = 0.01;
-  meadow.receiveShadow = true;
-  scene.add(meadow);
-
-  const path = new THREE.Mesh(
-    new THREE.RingGeometry(6.2, 8.4, 64),
-    new THREE.MeshStandardMaterial({ color: 0x3d4c63, roughness: 1 }),
-  );
-  path.rotation.x = -Math.PI / 2;
-  path.position.y = 0.02;
-  path.receiveShadow = true;
-  scene.add(path);
-
-  const rockMaterial = new THREE.MeshStandardMaterial({ color: 0x243049, roughness: 1 });
-  const rockGeometry = new THREE.DodecahedronGeometry(0.6, 0);
-  for (let i = 0; i < 30; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 6 + Math.random() * (WORLD.island_radius - 8);
-    const rock = new THREE.Mesh(rockGeometry, rockMaterial);
-    rock.position.set(Math.cos(angle) * radius, 0.1, Math.sin(angle) * radius);
-    const scale = 0.5 + Math.random() * 1.1;
-    rock.scale.set(scale, scale * (0.6 + Math.random() * 0.6), scale);
-    rock.rotation.set(Math.random(), Math.random(), Math.random());
-    rock.castShadow = true;
-    rock.receiveShadow = true;
-    scene.add(rock);
-  }
-
-  const grassMaterial = new THREE.MeshStandardMaterial({ color: 0x2f5a52, roughness: 1 });
-  const grassGeometry = new THREE.ConeGeometry(0.12, 0.7, 5);
-  for (let i = 0; i < 90; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 2 + Math.random() * (WORLD.island_radius - 3);
-    const tuft = new THREE.Mesh(grassGeometry, grassMaterial);
-    tuft.position.set(Math.cos(angle) * radius, 0.35, Math.sin(angle) * radius);
-    tuft.rotation.y = Math.random() * Math.PI;
-    tuft.scale.setScalar(0.6 + Math.random() * 0.9);
-    scene.add(tuft);
-  }
-
-  // sea of clouds below the island
-  const cloudMaterial = new THREE.MeshStandardMaterial({ color: 0x1a2236, roughness: 1 });
-  const cloudGeometry = new THREE.SphereGeometry(1, 10, 8);
-  for (let i = 0; i < 60; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 36 + Math.random() * 26;
-    const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
-    cloud.position.set(Math.cos(angle) * radius, -9 + Math.random() * 5, Math.sin(angle) * radius);
-    cloud.scale.set(4 + Math.random() * 5, 1.4 + Math.random() * 1.4, 4 + Math.random() * 5);
-    scene.add(cloud);
-  }
-
-  // stars + moon
+  /* ---------------- static sky ---------------- */
   const starPositions = new Float32Array(900 * 3);
   for (let i = 0; i < 900; i++) {
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(Math.random() * 0.85);
-    const radius = 230;
+    const radius = 320;
     starPositions[i * 3] = Math.cos(theta) * Math.sin(phi) * radius;
-    starPositions[i * 3 + 1] = Math.cos(phi) * radius + 10;
+    starPositions[i * 3 + 1] = Math.cos(phi) * radius + 20;
     starPositions[i * 3 + 2] = Math.sin(theta) * Math.sin(phi) * radius;
   }
   const starGeometry = new THREE.BufferGeometry();
   starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
   const stars = new THREE.Points(
     starGeometry,
-    new THREE.PointsMaterial({ color: 0xc6d6ff, size: 1.6, transparent: true, opacity: 0.8, fog: false }),
+    new THREE.PointsMaterial({ color: 0xc6d6ff, size: 2, transparent: true, opacity: 0.8, fog: false }),
   );
   scene.add(stars);
 
   const moon = new THREE.Mesh(
-    new THREE.SphereGeometry(7, 24, 18),
+    new THREE.SphereGeometry(9, 24, 18),
     new THREE.MeshBasicMaterial({ color: 0xfff1cd, fog: false }),
   );
-  moon.position.set(-95, 95, -150);
+  moon.position.set(-140, 150, -230);
   scene.add(moon);
   const moonGlow = new THREE.Sprite(
     new THREE.SpriteMaterial({
-      map: glowTexture(),
+      map: glowTex,
       color: 0xdfe6ff,
       transparent: true,
       opacity: 0.45,
@@ -329,21 +410,253 @@ export function createStage(container) {
     }),
   );
   moonGlow.position.copy(moon.position);
-  moonGlow.scale.setScalar(58);
+  moonGlow.scale.setScalar(80);
   scene.add(moonGlow);
 
-  // --- dynamic objects ---------------------------------------------
+  // Sea of clouds below every island.
+  const cloudGroup = new THREE.Group();
+  scene.add(cloudGroup);
+  {
+    const cloudMaterial = new THREE.MeshStandardMaterial({ color: PALETTE.sea, roughness: 1 });
+    const cloudGeometry = new THREE.SphereGeometry(1, 10, 8);
+    const rng = mulberry32(1234);
+    for (let i = 0; i < 70; i++) {
+      const angle = rng() * Math.PI * 2;
+      const radius = 70 + rng() * 80;
+      const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
+      cloud.position.set(Math.cos(angle) * radius, -12 + rng() * 6, Math.sin(angle) * radius);
+      cloud.scale.set(6 + rng() * 8, 1.6 + rng() * 1.8, 6 + rng() * 8);
+      cloudGroup.add(cloud);
+    }
+  }
+
+  /* ---------------- terrain ---------------- */
+  const terrain = new THREE.Group();
+  scene.add(terrain);
+
+  const materials = {
+    ground: new THREE.MeshStandardMaterial({ color: PALETTE.ground, roughness: 1 }),
+    side: new THREE.MeshStandardMaterial({ color: PALETTE.groundSide, roughness: 1 }),
+    tier1: new THREE.MeshStandardMaterial({ color: PALETTE.tier1, roughness: 1 }),
+    tier2: new THREE.MeshStandardMaterial({ color: PALETTE.tier2, roughness: 1 }),
+    bridge: new THREE.MeshStandardMaterial({ color: PALETTE.bridge, roughness: 1 }),
+    ramp: new THREE.MeshStandardMaterial({ color: PALETTE.ramp, roughness: 1 }),
+    rock: new THREE.MeshStandardMaterial({ color: PALETTE.rock, roughness: 1 }),
+    grass: new THREE.MeshStandardMaterial({ color: PALETTE.grass, roughness: 1 }),
+    path: new THREE.MeshStandardMaterial({ color: PALETTE.path, roughness: 1 }),
+  };
+
+  function clearTerrain() {
+    while (terrain.children.length) {
+      const child = terrain.children.pop();
+      child.traverse?.((node) => {
+        if (node.geometry) node.geometry.dispose();
+      });
+      terrain.remove(child);
+    }
+  }
+
+  function addDisc(cx, cz, r, y, material) {
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r + 0.8, 2.4, 72), material);
+    mesh.position.set(cx, y - 1.2, cz);
+    mesh.receiveShadow = true;
+    terrain.add(mesh);
+
+    const top = new THREE.Mesh(new THREE.CircleGeometry(r, 72), material === materials.ground ? materials.ground : material);
+    top.rotation.x = -Math.PI / 2;
+    top.position.set(cx, y + 0.01, cz);
+    top.receiveShadow = true;
+    terrain.add(top);
+  }
+
+  function beam(a, b, width, material) {
+    const from = new THREE.Vector3(a.x, a.y, a.z);
+    const to = new THREE.Vector3(b.x, b.y, b.z);
+    const dir = new THREE.Vector3().subVectors(to, from);
+    const length = dir.length();
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, 0.34, length), material);
+    mesh.position.copy(from).add(to).multiplyScalar(0.5);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.normalize());
+    mesh.receiveShadow = true;
+    mesh.castShadow = true;
+    return mesh;
+  }
+
+  function addArcWall(radius, y0, y1, material, { fromDeg = 0, toDeg = 360, skipAngles = [], skipHalfWidth = 0 } = {}) {
+    const segments = Math.max(8, Math.round(((toDeg - fromDeg) / 360) * 96));
+    const step = (toDeg - fromDeg) / segments;
+    for (let i = 0; i < segments; i++) {
+      const mid = fromDeg + i * step + step / 2;
+      if (skipAngles.some((a) => Math.abs(((mid - a + 540) % 360) - 180) < skipHalfWidth)) continue;
+      const arc = ((step * Math.PI) / 180) * radius;
+      const box = new THREE.Mesh(new THREE.BoxGeometry(arc * 1.02, y1 - y0, 0.6), material);
+      const a = (mid * Math.PI) / 180;
+      box.position.set(Math.cos(a) * radius, (y0 + y1) / 2, Math.sin(a) * radius);
+      box.rotation.y = -a + Math.PI / 2;
+      box.castShadow = true;
+      box.receiveShadow = true;
+      terrain.add(box);
+    }
+  }
+
+  function scatter(rng, count, minR, maxR, make) {
+    for (let i = 0; i < count; i++) {
+      const angle = rng() * Math.PI * 2;
+      const radius = minR + rng() * (maxR - minR);
+      const obj = make(rng);
+      obj.position.set(Math.cos(angle) * radius, obj.position.y, Math.sin(angle) * radius);
+      obj.rotation.y = rng() * Math.PI;
+      terrain.add(obj);
+    }
+  }
+
+  function addDecor(radius) {
+    const rng = mulberry32(77 + radius);
+    const rockGeometry = new THREE.DodecahedronGeometry(0.6, 0);
+    scatter(rng, Math.round(radius * 0.75), 5, radius - 3, () => {
+      const rock = new THREE.Mesh(rockGeometry, materials.rock);
+      const scale = 0.5 + rng() * 1.1;
+      rock.scale.set(scale, scale * (0.6 + rng() * 0.6), scale);
+      rock.position.y = 0.1;
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      return rock;
+    });
+
+    const grassGeometry = new THREE.ConeGeometry(0.12, 0.7, 5);
+    scatter(rng, Math.round(radius * 2.2), 2, radius - 1, () => {
+      const tuft = new THREE.Mesh(grassGeometry, materials.grass);
+      tuft.position.y = 0.35;
+      tuft.scale.setScalar(0.6 + rng() * 0.9);
+      return tuft;
+    });
+  }
+
+  function buildCircle(map) {
+    const t = map.terrain;
+    addDisc(t.cx, t.cz, t.r, t.y, materials.ground);
+    addDecor(t.r);
+    const path = new THREE.Mesh(new THREE.RingGeometry(6.2, 8.4, 64), materials.path);
+    path.rotation.x = -Math.PI / 2;
+    path.position.set(t.cx, t.y + 0.03, t.cz);
+    path.receiveShadow = true;
+    terrain.add(path);
+  }
+
+  function buildIslands(map) {
+    const t = map.terrain;
+    for (const circle of t.circles) {
+      addDisc(circle.cx, circle.cz, circle.r, circle.y, materials.ground);
+      addDecor(circle.r);
+    }
+    const b = t.bridge;
+    const midZ = (b.z0 + b.z1) / 2;
+    const bridge = beam(
+      { x: b.x0, y: b.y - 0.18, z: midZ },
+      { x: b.x1, y: b.y - 0.18, z: midZ },
+      b.z1 - b.z0,
+      materials.bridge,
+    );
+    terrain.add(bridge);
+    // Rope rails, purely decorative.
+    for (const side of [-1, 1]) {
+      const rail = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.04, b.x1 - b.x0, 6),
+        new THREE.MeshStandardMaterial({ color: 0x6b543c, roughness: 0.9 }),
+      );
+      rail.rotation.z = Math.PI / 2;
+      rail.position.set((b.x0 + b.x1) / 2, b.y + 0.9, midZ + side * ((b.z1 - b.z0) / 2 - 0.2));
+      terrain.add(rail);
+    }
+  }
+
+  function buildTiers(map) {
+    const t = map.terrain;
+    addDisc(0, 0, t.radius, 0, materials.ground);
+    addDecor(t.radius);
+
+    // Tier 1: half annulus on z > 0 with a raised rim and two ramp openings.
+    const t1 = t.tier1;
+    const half = new THREE.Mesh(
+      new THREE.RingGeometry(t1.r0, t1.r1, 72, 1, Math.PI, Math.PI),
+      materials.tier1,
+    );
+    half.rotation.x = -Math.PI / 2;
+    half.position.y = t1.y + 0.01;
+    half.receiveShadow = true;
+    terrain.add(half);
+
+    const innerTop = new THREE.Mesh(
+      new THREE.RingGeometry(t1.r0 - 0.9, t1.r0, 72, 1, Math.PI, Math.PI),
+      materials.side,
+    );
+    innerTop.rotation.x = -Math.PI / 2;
+    innerTop.position.y = t1.y;
+    terrain.add(innerTop);
+
+    addArcWall(t1.r0, 0, t1.y, materials.side, { fromDeg: 0, toDeg: 180 });
+    addArcWall(t1.r1, 0, t1.y, materials.side, { fromDeg: 0, toDeg: 180, skipAngles: [30, 150], skipHalfWidth: 9 });
+
+    // Ramps: walkable beams from the ground to the terrace.
+    for (const ramp of t.ramps) {
+      const a = (ramp.angle * Math.PI) / 180;
+      const near = { x: Math.cos(a) * ramp.r0, y: ramp.y0, z: Math.sin(a) * ramp.r0 };
+      const far = { x: Math.cos(a) * ramp.r1, y: ramp.y1, z: Math.sin(a) * ramp.r1 };
+      const rampMesh = beam(near, far, ramp.width, materials.ramp);
+      rampMesh.position.y += 0.12;
+      terrain.add(rampMesh);
+    }
+
+    // Tier 2: the floating bell-tower platform.
+    const t2 = t.tier2;
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(t2.r, t2.r - 0.6, 0.8, 56), materials.tier2);
+    disc.position.y = t2.y - 0.4;
+    disc.castShadow = true;
+    disc.receiveShadow = true;
+    terrain.add(disc);
+
+    // Bell tower.
+    const tower = t.tower;
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(tower.r, tower.r * 1.1, tower.height, 24),
+      new THREE.MeshStandardMaterial({ color: 0x6b5238, emissive: 0x241708, emissiveIntensity: 0.5, roughness: 0.9 }),
+    );
+    shaft.position.y = t2.y + tower.height / 2;
+    shaft.castShadow = true;
+    terrain.add(shaft);
+
+    const bellRoof = new THREE.Mesh(
+      new THREE.ConeGeometry(tower.r * 1.5, 1.6, 8),
+      new THREE.MeshStandardMaterial({ color: 0x2b1d19, roughness: 0.9 }),
+    );
+    bellRoof.position.y = t2.y + tower.height + 0.8;
+    bellRoof.castShadow = true;
+    terrain.add(bellRoof);
+
+    const bell = new THREE.Mesh(
+      new THREE.SphereGeometry(0.7, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshStandardMaterial({ color: 0xc9a24a, emissive: 0x6b4a10, emissiveIntensity: 0.4, metalness: 0.7, roughness: 0.4 }),
+    );
+    bell.rotation.x = Math.PI;
+    bell.position.y = t2.y + tower.height - 1.2;
+    terrain.add(bell);
+  }
+
+  /* ---------------- dynamic objects ---------------- */
   const player = makePlayer();
   scene.add(player.group);
 
   const lanterns = new Map();
   const motes = new Map();
   const shades = new Map();
+  const drifters = new Map();
+  const charms = new Map();
+  const pads = [];
 
   const moteGeometry = new THREE.SphereGeometry(0.15, 12, 10);
-  const moteMaterial = new THREE.MeshBasicMaterial({ color: 0xffe9ad });
+  const moteMaterial = new THREE.MeshBasicMaterial({ color: PALETTE.mote });
   const moteGlowMaterial = new THREE.SpriteMaterial({
-    map: glowTexture(),
+    map: glowTex,
     color: 0xffd27a,
     transparent: true,
     opacity: 0.8,
@@ -351,28 +664,95 @@ export function createStage(container) {
     depthWrite: false,
   });
 
+  // A single point cloud carries the windblown leaves.
+  const windCount = 260;
+  const windPositions = new Float32Array(windCount * 3);
+  const windGeo = new THREE.BufferGeometry();
+  windGeo.setAttribute('position', new THREE.BufferAttribute(windPositions, 3));
+  const leafCanvas = document.createElement('canvas');
+  leafCanvas.width = leafCanvas.height = 32;
+  const leaf = leafCanvas.getContext('2d');
+  leaf.fillStyle = '#fff';
+  leaf.beginPath();
+  leaf.moveTo(3, 26);
+  leaf.quadraticCurveTo(5, 6, 29, 5);
+  leaf.quadraticCurveTo(27, 27, 3, 26);
+  leaf.fill();
+  const windPoints = new THREE.Points(
+    windGeo,
+    new THREE.PointsMaterial({
+      color: 0xc8b77a,
+      map: new THREE.CanvasTexture(leafCanvas),
+      size: 0.42,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    }),
+  );
+  windPoints.frustumCulled = false;
+  windPoints.visible = false;
+  scene.add(windPoints);
+  const windRng = mulberry32(4242);
+  const windSeed = new Float32Array(windCount * 3);
+  for (let i = 0; i < windCount; i++) {
+    windSeed[i * 3] = (windRng() - 0.5) * 70;
+    windSeed[i * 3 + 1] = 0.4 + windRng() * 7;
+    windSeed[i * 3 + 2] = (windRng() - 0.5) * 70;
+  }
+
+  let night = 0;
   let firstFrame = true;
   let elapsed = 0;
   let lastPlayerX = 0;
   let lastPlayerZ = 0;
   let facing = 0;
+  let windPhase = 0;
   const cameraTarget = new THREE.Vector3();
   const desiredCamera = new THREE.Vector3();
   const fogTarget = new THREE.Color();
 
+  function resetDynamic() {
+    for (const map of [lanterns, motes, shades, drifters, charms]) {
+      for (const [, built] of map) {
+        scene.remove(built.group ?? built);
+      }
+      map.clear();
+    }
+    for (const pad of pads) scene.remove(pad);
+    pads.length = 0;
+  }
+
+  function setNight(map) {
+    if (night === map.night) return;
+    night = map.night;
+    clearTerrain();
+    resetDynamic();
+    if (map.terrain.kind === 'circle') buildCircle(map);
+    else if (map.terrain.kind === 'islands') buildIslands(map);
+    else buildTiers(map);
+    for (const pad of map.pads) {
+      const mesh = makePad(pad);
+      scene.add(mesh);
+      pads.push(mesh);
+    }
+    firstFrame = true;
+  }
+
   function syncLanterns(world) {
     for (const data of world.lanterns) {
-      if (!lanterns.has(data.id)) {
-        const built = makeLantern();
-        built.group.position.set(data.x, 0, data.z);
+      let built = lanterns.get(data.id);
+      if (!built) {
+        built = makeLantern();
         scene.add(built.group);
         lanterns.set(data.id, built);
       }
+      built.group.position.set(data.x, data.y, data.z);
     }
   }
 
   function update(world, dt, view) {
     elapsed += dt;
+    if (world.map) setNight(world.map);
     syncLanterns(world);
 
     const litCount = world.lanterns.filter((l) => l.lit).length;
@@ -381,13 +761,12 @@ export function createStage(container) {
     for (const data of world.lanterns) {
       const built = lanterns.get(data.id);
       if (!built) continue;
-      built.group.position.set(data.x, 0, data.z);
       const target = data.lit ? 1.7 : 0.04;
       built.bodyMaterial.emissiveIntensity += (target - built.bodyMaterial.emissiveIntensity) * Math.min(1, dt * 5);
-      built.light.intensity += ((data.lit ? 46 : 0) - built.light.intensity) * Math.min(1, dt * 4);
+      built.light.intensity += ((data.lit ? 52 : 0) - built.light.intensity) * Math.min(1, dt * 4);
       built.glow.material.opacity += ((data.lit ? 0.7 : 0.16) - built.glow.material.opacity) * Math.min(1, dt * 4);
       built.glow.scale.setScalar((data.lit ? 4.6 : 1.1) + Math.sin(elapsed * 1.7 + data.x) * (data.lit ? 0.25 : 0.05));
-      built.safeRing.material.opacity += ((data.lit ? 0.16 : 0) - built.safeRing.material.opacity) * Math.min(1, dt * 3);
+      built.safeRing.material.opacity += ((data.lit ? 0.18 : 0) - built.safeRing.material.opacity) * Math.min(1, dt * 3);
     }
 
     // motes
@@ -406,7 +785,7 @@ export function createStage(container) {
         motes.set(data.id, mesh);
       }
       const bob = Math.sin(elapsed * 2.1 + mesh.phase) * 0.12;
-      mesh.group.position.set(data.x, 0.72 + bob, data.z);
+      mesh.group.position.set(data.x, data.y + 0.72 + bob, data.z);
       mesh.group.rotation.y += dt * 0.8;
     }
     for (const [id, mesh] of motes) {
@@ -427,11 +806,13 @@ export function createStage(container) {
         shades.set(data.id, mesh);
       }
       const stunned = data.state === 'stunned';
-      mesh.group.position.set(data.x, 1.05 + Math.sin(elapsed * 1.6 + mesh.phase) * 0.1, data.z);
+      const spawning = data.state === 'spawning';
+      const opacity = spawning ? 0.45 : 1;
+      mesh.group.scale.setScalar(spawning ? 0.6 + 0.4 * (1 - data.state_ticks_left / 30) : 1);
+      mesh.group.position.set(data.x, data.baseY + 1.05 + Math.sin(elapsed * 1.6 + mesh.phase) * 0.1, data.z);
       mesh.group.rotation.y += dt * (stunned ? 0.2 : 0.7);
       mesh.coreMaterial.emissiveIntensity += ((stunned ? 0.15 : 0.55) - mesh.coreMaterial.emissiveIntensity) * Math.min(1, dt * 5);
-      mesh.coreMaterial.color.lerp(new THREE.Color(stunned ? 0x6b4a9e : 0x1b1026), Math.min(1, dt * 5));
-      mesh.coreMaterial.opacity += ((stunned ? 0.55 : 0.92) - mesh.coreMaterial.opacity) * Math.min(1, dt * 5);
+      mesh.coreMaterial.opacity += ((stunned ? 0.55 : 0.92) * opacity - mesh.coreMaterial.opacity) * Math.min(1, dt * 5);
       mesh.stunRing.visible = stunned;
       if (stunned) mesh.stunRing.rotation.z += dt * 3;
     }
@@ -439,6 +820,51 @@ export function createStage(container) {
       if (seenShades.has(id)) continue;
       scene.remove(mesh.group);
       shades.delete(id);
+    }
+
+    // drifters
+    const seenDrifters = new Set();
+    for (const data of world.drifters) {
+      seenDrifters.add(data.id);
+      let mesh = drifters.get(data.id);
+      if (!mesh) {
+        const built = makeDrifter();
+        scene.add(built.group);
+        mesh = { ...built, phase: Math.random() * Math.PI * 2 };
+        drifters.set(data.id, mesh);
+      }
+      const hover = Math.sin(elapsed * 3 + mesh.phase) * 0.25;
+      mesh.group.position.set(data.x, data.y + hover, data.z);
+      mesh.group.rotation.y = Math.atan2(world.player.x - data.x, world.player.z - data.z);
+      mesh.group.rotation.z = Math.sin(elapsed * 6 + mesh.phase) * 0.12;
+      for (const [i, wing] of mesh.wings.entries()) {
+        wing.rotation.z = (i === 0 ? 1 : -1) * (0.35 + Math.sin(elapsed * 9 + mesh.phase) * 0.35);
+      }
+      mesh.material.opacity = data.state === 'chase' ? 0.95 : 0.7;
+    }
+    for (const [id, mesh] of drifters) {
+      if (seenDrifters.has(id)) continue;
+      scene.remove(mesh.group);
+      drifters.delete(id);
+    }
+
+    // charms
+    for (const data of world.charms) {
+      let mesh = charms.get(data.id);
+      if (!mesh) {
+        mesh = makeCharm();
+        scene.add(mesh.group);
+        charms.set(data.id, mesh);
+      }
+      mesh.group.visible = data.available;
+      mesh.group.position.set(data.x, data.y + 1.1 + Math.sin(elapsed * 2.4 + data.x) * 0.15, data.z);
+      mesh.core.rotation.y += dt * 1.4;
+      mesh.ring.rotation.z += dt * 0.9;
+    }
+
+    // jump pads pulse
+    for (const pad of pads) {
+      pad.children[1].material.opacity = 0.55 + Math.sin(elapsed * 3) * 0.25;
     }
 
     // player
@@ -458,9 +884,27 @@ export function createStage(container) {
     const bob = speed > 0.4 ? Math.abs(Math.sin(elapsed * 9)) * 0.07 : Math.sin(elapsed * 2) * 0.015;
     player.bodyGroup.position.y = bob;
     player.lantern.rotation.z = Math.sin(elapsed * 3.2) * 0.18;
-    player.light.intensity = 6 + p.carried * 1.4;
+    const charmActive = world.player.charm_until > world.sim_tick;
+    player.light.intensity = 6 + p.carried * 0.9 + (charmActive ? 6 : 0);
+    player.light.color.setHex(charmActive ? PALETTE.charm : PALETTE.lanternWarm);
     lastPlayerX = p.x;
     lastPlayerZ = p.z;
+
+    // Show leaves during the warning and the gust.
+    const windOn = world.wind.active || world.wind.warned;
+    windPoints.material.opacity += ((windOn ? 0.55 : 0) - windPoints.material.opacity) * Math.min(1, dt * 3);
+    windPoints.visible = windPoints.material.opacity > 0.01;
+    if (windOn) {
+      windPhase += dt * (world.wind.active ? 26 : 10);
+      const a = (world.wind.dir_deg * Math.PI) / 180;
+      for (let i = 0; i < windCount; i++) {
+        const travel = ((windPhase + i * 3.7) % 60) - 30;
+        windPositions[i * 3] = p.x + Math.cos(a) * travel + windSeed[i * 3] * 0.35;
+        windPositions[i * 3 + 1] = p.y + windSeed[i * 3 + 1];
+        windPositions[i * 3 + 2] = p.z + Math.sin(a) * travel + windSeed[i * 3 + 2] * 0.35;
+      }
+      windGeo.attributes.position.needsUpdate = true;
+    }
 
     // camera
     cameraTarget.set(p.x, p.y + 1.25, p.z);
@@ -470,7 +914,7 @@ export function createStage(container) {
       cameraTarget.y + Math.sin(view.pitch) * view.dist,
       cameraTarget.z - Math.cos(view.yaw) * view.dist * cosPitch,
     );
-    desiredCamera.y = Math.max(desiredCamera.y, 1.1);
+    desiredCamera.y = Math.max(desiredCamera.y, p.y + 1.1);
     if (firstFrame) {
       camera.position.copy(desiredCamera);
       firstFrame = false;
@@ -480,14 +924,18 @@ export function createStage(container) {
     camera.lookAt(cameraTarget);
 
     // atmosphere shifts warmer with every lantern
+    const warmColor = new THREE.Color(0x2a1d2e);
     fogTarget.copy(nightColor).lerp(warmColor, ratio * 0.9);
     scene.fog.color.lerp(fogTarget, Math.min(1, dt * 1.5));
     scene.background.copy(scene.fog.color);
-    scene.fog.density = 0.014 - ratio * 0.003;
-    hemi.intensity = 0.8 + ratio * 0.45;
-    warmLight.intensity = ratio * 34;
-    warmLight.position.set(p.x * 0.3, 14, p.z * 0.3);
+    scene.fog.density = 0.008 - ratio * 0.0018;
+    ambient.intensity = 0.15 + 0.55 * ratio;
+    hemi.intensity = 0.8;
+    warmLight.intensity = ratio * 40;
+    warmLight.position.set(p.x * 0.3, 18, p.z * 0.3);
     stars.material.opacity = 0.8 - ratio * 0.45;
+    moonLight.position.set(p.x + 40, 60, p.z + 24);
+    moonLight.target.position.set(p.x, 0, p.z);
   }
 
   function render() {
@@ -502,5 +950,19 @@ export function createStage(container) {
 
   window.addEventListener('resize', resize);
 
-  return { update, render, resize, camera, domElement: renderer.domElement };
+  return { update, render, resize, camera, setNight, domElement: renderer.domElement };
 }
+
+// Small deterministic PRNG for decorative scattering (never used by the sim).
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function rng() {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export const ISLAND_RADIUS = WORLD.mote_initial; // kept for backwards-compatible imports

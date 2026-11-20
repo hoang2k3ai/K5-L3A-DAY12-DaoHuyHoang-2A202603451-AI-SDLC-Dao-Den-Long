@@ -3,37 +3,47 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Đảo Đèn Lồng — Đêm 1</title>
+    <title>Đảo Đèn Lồng — Ba hòn đảo, ba đêm</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <div id="app"></div>
 
-    <div id="hud">
+    <div id="hud" class="hidden">
       <div class="hud-top">
-        <div class="panel">
-          <span class="label">Ánh sáng</span>
-          <div id="flames" class="pips"></div>
-        </div>
-        <div class="panel"><span class="label">Đom đóm</span><span id="carried" class="value">0/5</span></div>
+        <div class="panel night"><span class="label">Hành trình</span><span id="night-label" class="value">Đêm 1</span></div>
+        <div class="panel"><span class="label">Ngọn Lửa</span><div id="flames" class="pips"></div></div>
+        <div class="panel clock"><span id="timer" class="value">05:00</span></div>
+        <div class="hud-score">
         <div class="panel"><span class="label">Đèn lồng</span><span id="lanterns" class="value">0/5</span></div>
         <div class="panel"><span class="label">Điểm</span><span id="score" class="value">0</span></div>
-        <div class="panel"><span class="label">Còn lại</span><span id="timer" class="value">05:00</span></div>
+        </div>
+      </div>
+      <div class="hud-abilities">
+        <div class="panel"><span class="label">Lướt</span><span id="dash" class="value">sẵn sàng</span></div>
+        <div class="panel"><span class="label">Toả sáng</span><span id="pulse" class="value">sẵn sàng</span></div>
+        <div class="panel"><span class="label">Bùa Gió</span><span id="charm" class="value">—</span></div>
+      </div>
+      <div class="hud-middle">
+        <div id="wind-banner" class="banner wind hidden">Gió Lạc đang thổi</div>
+        <div id="drifter-banner" class="banner drifter hidden">Gió Lạc đang đuổi theo bạn!</div>
       </div>
       <div class="hud-bottom">
-        <div class="hint">WASD di chuyển · Space nhảy · E nạp đèn · Q tỏa sáng · R chơi lại · kéo chuột để xoay camera</div>
-        <div class="objective" id="objective">Thắp lại 5 Đèn Lồng Lớn trước khi sương đen nuốt mất đảo.</div>
+        <div id="deposit-hint" class="hint hidden"></div>
+        <div class="panel mote-meter"><span id="mote-slots" class="pips"></span><span id="carried" class="value">0/10</span></div>
+        <div class="hint" id="hint">
+          WASD di chuyển · Space nhảy · Shift lướt · E nạp đèn · Q toả sáng · Esc/P tạm dừng · kéo chuột để xoay camera
+        </div>
+        <div class="objective" id="objective">Thắp lại các Đèn Lồng Lớn trước khi sương đen nuốt mất đảo.</div>
       </div>
+      <div id="lantern-arrow" class="hidden" aria-label="Hướng đến đèn chưa sáng">▲</div>
     </div>
 
     <div id="flash"></div>
+    <div id="dawn" class="hidden"></div>
 
     <div id="overlay" class="hidden">
-      <div class="card">
-        <h1 id="overlay-title">Đêm đã sáng</h1>
-        <p id="overlay-text"></p>
-        <button id="restart" type="button">Chơi lại (R)</button>
-      </div>
+      <div id="card" class="card"></div>
     </div>
 
     <script type="module" src="/src/main.js"></script>
